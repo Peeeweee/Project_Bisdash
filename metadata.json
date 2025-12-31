@@ -1,0 +1,7 @@
+{
+  "name": "Bisdash ATM Manager",
+  "description": "An intuitive ATM business management platform designed for clarity, helping operators track 15-day deductions, interest gains, and customer performance with ease.",
+  "requestFramePermissions": [
+    "geolocation"
+  ]
+}
