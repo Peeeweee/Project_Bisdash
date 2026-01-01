@@ -103,6 +103,7 @@ const App: React.FC = () => {
   const [isVoidModalOpen, setIsVoidModalOpen] = useState(false);
   const [isExtendModalOpen, setIsExtendModalOpen] = useState(false);
   const [extensionMonths, setExtensionMonths] = useState(1);
+  const [transactionsView, setTransactionsView] = useState<'customer' | 'investor'>('customer');
 
   const [baseInvestors, setBaseInvestors] = useState<Investor[]>(initialInvestors);
   const [customers, setCustomers] = useState<Customer[]>(initialCustomers.map(c => ({
@@ -174,7 +175,7 @@ const App: React.FC = () => {
     date: new Date().toISOString().split('T')[0],
     time: new Date().toLocaleTimeString('en-US', { hour12: false }).slice(0, 5),
     location: '',
-    proof: null as File | null,
+    proofs: [] as File[],
     correctionReason: ''
   });
 
@@ -298,7 +299,7 @@ const App: React.FC = () => {
       date: currentPayment ? currentPayment.date : new Date().toISOString().split('T')[0],
       time: currentPayment ? (currentPayment.verifiedAt?.split(' ')[1] || new Date().toLocaleTimeString('en-US', { hour12: false }).slice(0, 5)) : new Date().toLocaleTimeString('en-US', { hour12: false }).slice(0, 5),
       location: currentPayment?.location || '',
-      proof: null,
+      proofs: [],
       correctionReason: ''
     });
     setIsVerifying(true);
@@ -306,8 +307,8 @@ const App: React.FC = () => {
 
   const handleConfirmVerification = () => {
     if (!selectedCustomer || verifyingSlot === null) return;
-    if (!verifyForm.proof) {
-      alert("Please upload a photo of the receipt.");
+    if (verifyForm.proofs.length === 0) {
+      alert("Please upload at least one proof photo.");
       return;
     }
 
@@ -334,7 +335,8 @@ const App: React.FC = () => {
       status: status,
       verifiedAt: `${verifyForm.date} ${verifyForm.time}`,
       location: verifyForm.location,
-      proofImage: URL.createObjectURL(verifyForm.proof),
+      proofImages: verifyForm.proofs.map(p => URL.createObjectURL(p)),
+      proofImage: URL.createObjectURL(verifyForm.proofs[0]), // Backwards compat
       isLocked: true,
       correctionReason: verifyForm.correctionReason || undefined
     };
@@ -850,45 +852,74 @@ const App: React.FC = () => {
   };
 
   // --- Transactions Tab ---
+  // --- Transactions Tab ---
   const renderTransactionsPage = () => (
     <div className="space-y-10 animate-in fade-in slide-in-from-bottom-6 duration-700 italic">
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 italic">
-        <div className="italic">
-          <h2 className="text-5xl font-black text-slate-900 tracking-tight italic">Money Feed</h2>
-          <p className="text-slate-500 mt-2 text-lg font-medium italic">Every collection recorded, across all customers.</p>
+      <div className="flex flex-col gap-6 italic">
+        <div className="flex justify-between items-end">
+          <div className="italic">
+            <h2 className="text-5xl font-black text-slate-900 tracking-tight italic">Money Feed</h2>
+            <p className="text-slate-500 mt-2 text-lg font-medium italic">Track flow of funds across the system.</p>
+          </div>
+          <div className="flex bg-slate-100 p-1.5 rounded-2xl italic">
+            <button onClick={() => setTransactionsView('customer')} className={`px-8 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all italic ${transactionsView === 'customer' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}>Customer Payments</button>
+            <button onClick={() => setTransactionsView('investor')} className={`px-8 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all italic ${transactionsView === 'investor' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}>Investor Ledger</button>
+          </div>
         </div>
-        <div className="flex bg-white p-2 rounded-[1.8rem] border border-slate-100 shadow-sm italic overflow-x-auto">
-          {['ALL', 'PAID', 'SHORT', 'ADVANCE', 'LATE'].map(f => (
-            <button key={f} onClick={() => setTransactionFilter(f as any)} className={`px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all italic whitespace-nowrap ${transactionFilter === f ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-400 hover:text-slate-600'}`}>{f}</button>
-          ))}
-        </div>
-      </div>
-      <div className="bg-white rounded-[3rem] border border-slate-100 shadow-sm overflow-hidden italic">
-        <table className="w-full text-left border-collapse italic">
-          <thead>
-            <tr className="bg-slate-50/50 font-black uppercase text-[10px] tracking-widest text-slate-400 italic">
-              <th className="px-10 py-6 italic">Customer</th>
-              <th className="px-10 py-6 italic">Date Collected</th>
-              <th className="px-10 py-6 italic">Money In</th>
-              <th className="px-10 py-6 italic">Verified Spot</th>
-              <th className="px-10 py-6 italic">Status</th>
-              <th className="px-10 py-6 italic">Receipt</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100 italic">
-            {filteredTransactions.map((tx) => (
-              <tr key={tx.id} className="hover:bg-slate-50/80 transition-all group italic">
-                <td className="px-10 py-8 italic"><div><p className="font-black text-slate-900 text-lg italic">{tx.customerName}</p><p className="text-[10px] font-bold text-slate-400 uppercase italic">From {tx.investorPool}'s Pool</p></div></td>
-                <td className="px-10 py-8 italic"><p className="font-bold text-slate-600 italic">{formatDate(tx.date)}</p><p className="text-[10px] font-medium text-slate-400 italic">{tx.verifiedAt?.split(' ')[1] || '12:00'}</p></td>
-                <td className="px-10 py-8 italic"><p className="font-black text-slate-900 text-xl tracking-tighter italic">{formatCurrency(tx.actualAmount)}</p>{tx.shortAmount > 0 && <p className="text-[9px] font-black text-red-500 uppercase italic">Short by {formatCurrency(tx.shortAmount)}</p>}</td>
-                <td className="px-10 py-8 italic"><div className="flex items-center gap-2 italic"><span className="text-emerald-500 italic">📍</span><p className="font-bold text-slate-500 text-sm italic">{tx.location || 'Not recorded'}</p></div></td>
-                <td className="px-10 py-8 italic"><span className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest italic ${tx.status === PaymentStatus.PAID ? 'bg-emerald-100 text-emerald-700' : tx.status === PaymentStatus.SHORT ? 'bg-amber-100 text-amber-700' : tx.status === PaymentStatus.ADVANCE ? 'bg-emerald-200 text-emerald-900' : 'bg-rose-100 text-rose-700'}`}>{tx.status}</span></td>
-                <td className="px-10 py-8 italic">{tx.proofImage ? (<button onClick={() => window.open(tx.proofImage, '_blank')} className="w-10 h-10 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center hover:bg-slate-900 hover:text-white transition-all shadow-sm italic text-xl">🖼️</button>) : (<span className="text-slate-300 italic text-sm font-medium italic">No proof</span>)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        {filteredTransactions.length === 0 && (<div className="py-24 text-center italic"><p className="text-slate-400 font-bold italic">No transactions found for this filter.</p></div>)}
+
+        {transactionsView === 'customer' ? (
+          <div className="bg-white rounded-[3rem] border border-slate-100 shadow-sm overflow-hidden italic">
+            <div className="p-8 border-b border-slate-50 flex justify-end">
+              <div className="flex bg-slate-50 p-2 rounded-[1.8rem] border border-slate-100 italic">
+                {['ALL', 'PAID', 'SHORT', 'ADVANCE', 'LATE'].map(f => (
+                  <button key={f} onClick={() => setTransactionFilter(f as any)} className={`px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all italic whitespace-nowrap ${transactionFilter === f ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-400 hover:text-slate-600'}`}>{f}</button>
+                ))}
+              </div>
+            </div>
+            <table className="w-full text-left border-collapse italic">
+              <thead>
+                <tr className="bg-slate-50/50 font-black uppercase text-[10px] tracking-widest text-slate-400 italic">
+                  <th className="px-10 py-6 italic">Customer</th>
+                  <th className="px-10 py-6 italic">Date Collected</th>
+                  <th className="px-10 py-6 italic">Money In</th>
+                  <th className="px-10 py-6 italic">Verified Spot</th>
+                  <th className="px-10 py-6 italic">Status</th>
+                  <th className="px-10 py-6 italic">Receipt</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 italic">
+                {filteredTransactions.map((tx) => (
+                  <tr key={tx.id} className="hover:bg-slate-50/80 transition-all group italic">
+                    <td className="px-10 py-8 italic"><div><p className="font-black text-slate-900 text-lg italic">{tx.customerName}</p><p className="text-[10px] font-bold text-slate-400 uppercase italic">From {tx.investorPool}'s Pool</p></div></td>
+                    <td className="px-10 py-8 italic"><p className="font-bold text-slate-600 italic">{formatDate(tx.date)}</p><p className="text-[10px] font-medium text-slate-400 italic">{tx.verifiedAt?.split(' ')[1] || '12:00'}</p></td>
+                    <td className="px-10 py-8 italic"><p className="font-black text-slate-900 text-xl tracking-tighter italic">{formatCurrency(tx.actualAmount)}</p>{tx.shortAmount > 0 && <p className="text-[9px] font-black text-red-500 uppercase italic">Short by {formatCurrency(tx.shortAmount)}</p>}</td>
+                    <td className="px-10 py-8 italic"><div className="flex items-center gap-2 italic"><span className="text-emerald-500 italic">📍</span><p className="font-bold text-slate-500 text-sm italic">{tx.location || 'Not recorded'}</p></div></td>
+                    <td className="px-10 py-8 italic"><span className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest italic ${tx.status === PaymentStatus.PAID ? 'bg-emerald-100 text-emerald-700' : tx.status === PaymentStatus.SHORT ? 'bg-amber-100 text-amber-700' : tx.status === PaymentStatus.ADVANCE ? 'bg-emerald-200 text-emerald-900' : 'bg-rose-100 text-rose-700'}`}>{tx.status}</span></td>
+                    <td className="px-10 py-8 italic">
+                      {tx.proofImages && tx.proofImages.length > 0 ? (
+                        <div className="flex -space-x-4 hover:space-x-1 transition-all">
+                          {tx.proofImages.map((img, idx) => (
+                            <button key={idx} onClick={() => window.open(img, '_blank')} className="w-10 h-10 rounded-xl bg-slate-100 border-2 border-white shadow-sm flex items-center justify-center hover:scale-110 transition-transform overflow-hidden relative z-10">
+                              <img src={img} alt="proof" className="w-full h-full object-cover" />
+                            </button>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-slate-300 italic text-sm font-medium italic">No proof</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {filteredTransactions.length === 0 && (<div className="py-24 text-center italic"><p className="text-slate-400 font-bold italic">No transactions found for this filter.</p></div>)}
+          </div>
+        ) : (
+          <div className="italic p-20 text-center bg-slate-50 rounded-[3rem] border-2 border-dashed border-slate-200">
+            <p className="text-slate-400 font-bold italic">Investor Ledger Feature Coming Soon</p>
+            <p className="text-sm text-slate-300 mt-2 italic">Tracking capital injections and withdrawals.</p>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -1059,9 +1090,28 @@ const App: React.FC = () => {
                     <div className="space-y-2 italic"><div className="flex justify-between items-end px-2 italic"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest italic ml-1 italic">Collection Amount (PHP)</label><span className="text-[10px] font-black text-[#10b981] italic">Expect: {formatCurrency(selectedCustomer?.biMonthlyDeduction || 0)}</span></div><input type="number" required value={verifyForm.amount} onChange={(e) => setVerifyForm({ ...verifyForm, amount: Number(e.target.value) })} className="w-full px-8 py-6 bg-slate-50 border-none rounded-[1.8rem] font-black text-3xl italic text-[#0f172a] focus:ring-2 focus:ring-emerald-500 transition-all italic text-center italic" /></div>
                     <div className="grid grid-cols-2 gap-4 italic"><div className="space-y-2 italic"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest italic ml-2 italic">Collection Date</label><input type="date" required value={verifyForm.date} onChange={(e) => setVerifyForm({ ...verifyForm, date: e.target.value })} className="w-full px-6 py-4 bg-slate-50 border-none rounded-[1.5rem] font-bold text-sm italic focus:ring-2 focus:ring-emerald-500 italic" /></div><div className="space-y-2 italic"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest italic ml-2 italic">Exact Time</label><input type="time" required value={verifyForm.time} onChange={(e) => setVerifyForm({ ...verifyForm, time: e.target.value })} className="w-full px-6 py-4 bg-slate-50 border-none rounded-[1.5rem] font-bold text-sm italic focus:ring-2 focus:ring-emerald-500 italic" /></div></div>
                     <div className="space-y-2 italic"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest italic ml-2 italic">Location / Spot</label><input type="text" required value={verifyForm.location} onChange={(e) => setVerifyForm({ ...verifyForm, location: e.target.value })} placeholder="e.g. Ayala Mall Lobby" className="w-full px-8 py-5 bg-slate-50 border-none rounded-[1.8rem] font-bold text-lg italic text-[#0f172a] focus:ring-2 focus:ring-emerald-500 transition-all italic" /></div>
-                    <div className="space-y-2 italic"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest italic ml-2 italic">Collection Proof (Photo)</label><div className="w-full h-32 border-2 border-dashed border-slate-100 rounded-[2rem] flex flex-col items-center justify-center relative bg-slate-50/50 hover:bg-slate-100/50 transition-colors group italic">{verifyForm.proof ? (<div className="flex flex-col items-center gap-2 italic"><span className="text-3xl italic">📸</span><p className="text-emerald-600 font-black italic text-[9px] px-4 truncate w-full text-center italic">{verifyForm.proof.name}</p></div>) : (<div className="flex flex-col items-center gap-1 italic"><p className="text-slate-400 italic font-black text-[10px] uppercase tracking-[0.2em] group-hover:text-slate-600 italic">Click to Attach Proof</p></div>)}<input type="file" required accept="image/*" onChange={(e) => setVerifyForm({ ...verifyForm, proof: e.target.files?.[0] || null })} className="absolute inset-0 opacity-0 cursor-pointer italic z-10" /></div></div>
+                    <div className="space-y-4 italic">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest italic ml-2 italic">Collection Proofs (Photos)</label>
+                      <div className="grid grid-cols-3 gap-3">
+                        {verifyForm.proofs.map((file, idx) => (
+                          <div key={idx} className="aspect-square bg-slate-100 rounded-2xl relative overflow-hidden group border border-slate-200">
+                            <img src={URL.createObjectURL(file)} className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" />
+                            <button type="button" onClick={() => setVerifyForm({ ...verifyForm, proofs: verifyForm.proofs.filter((_, i) => i !== idx) })} className="absolute top-1 right-1 bg-red-500 text-white w-5 h-5 rounded-full text-[10px] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">✕</button>
+                          </div>
+                        ))}
+                        <div className="aspect-square border-2 border-dashed border-slate-200 rounded-2xl flex flex-col items-center justify-center relative bg-slate-50 hover:bg-slate-100 transition-colors cursor-pointer group hover:border-emerald-300">
+                          <input type="file" multiple accept="image/*" onChange={(e) => {
+                            if (e.target.files) {
+                              setVerifyForm({ ...verifyForm, proofs: [...verifyForm.proofs, ...Array.from(e.target.files)] });
+                            }
+                          }} className="absolute inset-0 opacity-0 cursor-pointer z-10" />
+                          <span className="text-2xl mb-1 group-hover:scale-110 transition-transform">📷</span>
+                          <span className="text-[8px] font-black uppercase tracking-widest text-slate-400 group-hover:text-emerald-600">Add</span>
+                        </div>
+                      </div>
+                    </div>
                     {isUnlocking && (<div className="space-y-2 italic animate-in slide-in-from-top-2 duration-300 italic"><label className="text-[10px] font-black text-amber-600 uppercase tracking-widest italic ml-2 italic">Reason for Edit</label><textarea required value={verifyForm.correctionReason} onChange={(e) => setVerifyForm({ ...verifyForm, correctionReason: e.target.value })} placeholder="Why is this collection being changed?" className="w-full px-8 py-4 bg-amber-50 border-none rounded-[1.5rem] font-bold italic text-amber-900 focus:ring-2 focus:ring-amber-500 italic transition-all italic" rows={2} /></div>)}
-                    <div className="pt-4 italic"><button type="submit" disabled={!verifyForm.proof} className="w-full py-7 bg-[#10b981] text-white rounded-[2.2rem] font-black text-2xl italic hover:bg-emerald-600 shadow-[0_20px_50px_-15px_rgba(16,185,129,0.5)] active:scale-[0.97] transition-all disabled:opacity-40 disabled:grayscale italic">Save Collection</button><button type="button" onClick={() => { setIsVerifying(false); setIsUnlocking(false); }} className="w-full mt-6 text-[11px] font-black text-slate-300 uppercase tracking-[0.3em] hover:text-slate-500 transition-colors italic">Cancel Recording</button></div>
+                    <div className="pt-4 italic"><button type="submit" disabled={verifyForm.proofs.length === 0} className="w-full py-7 bg-[#10b981] text-white rounded-[2.2rem] font-black text-2xl italic hover:bg-emerald-600 shadow-[0_20px_50px_-15px_rgba(16,185,129,0.5)] active:scale-[0.97] transition-all disabled:opacity-40 disabled:grayscale italic">Save Collection</button><button type="button" onClick={() => { setIsVerifying(false); setIsUnlocking(false); }} className="w-full mt-6 text-[11px] font-black text-slate-300 uppercase tracking-[0.3em] hover:text-slate-500 transition-colors italic">Cancel Recording</button></div>
                   </form>
                 </div>
               </div>

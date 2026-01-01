@@ -19,7 +19,9 @@ export interface PaymentEntry {
   }[];
   status: PaymentStatus;
   // Verification metadata
-  proofImage?: string; 
+  // Verification metadata
+  proofImages: string[]; // Changed from single proofImage to array
+  proofImage?: string; // Kept for backward compatibility if needed, but primary is proofImages 
   verifiedAt?: string;
   location?: string;
   isLocked: boolean; // Integrity flag
