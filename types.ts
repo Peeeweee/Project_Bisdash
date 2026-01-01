@@ -43,6 +43,7 @@ export interface Customer {
   remainingBalance: number;
   payments: PaymentEntry[];
   isCompleted?: boolean; // New: Tracks if the loan is fully settled
+  extensions?: { id: string; date: string; addedMonths: number; addedInterest: number }[]; // New: Track extension history
 }
 
 export interface Investor {
@@ -55,6 +56,7 @@ export interface Investor {
   activeBatches: number;
   roi: number;
   performanceHistory: { month: string; profit: number }[];
+  withdrawals: { id: string; date: string; amount: number }[]; // New: Track capital outflows
   isWithdrawn?: boolean; // New: Flag for investors who pulled out
 }
 

@@ -24,7 +24,8 @@ export const mockCustomers: Customer[] = [
         shortAmount: 350,
         additionalPayments: [{ amount: 350, date: '2025-05-25' }],
         status: PaymentStatus.PAID,
-        isLocked: true
+        isLocked: true,
+        proofImages: []
       },
       {
         id: 'p2',
@@ -34,7 +35,8 @@ export const mockCustomers: Customer[] = [
         shortAmount: 1150,
         additionalPayments: [{ amount: 1150, date: '2025-05-25' }],
         status: PaymentStatus.PAID,
-        isLocked: true
+        isLocked: true,
+        proofImages: []
       }
     ]
   },
@@ -52,7 +54,7 @@ export const mockCustomers: Customer[] = [
     biMonthlyDeduction: 3858,
     remainingBalance: 4979,
     payments: [
-      { id: 'n1', date: '2025-01-25', expectedAmount: 3858, actualAmount: 3858, shortAmount: 0, additionalPayments: [], status: PaymentStatus.PAID, isLocked: true }
+      { id: 'n1', date: '2025-01-25', expectedAmount: 3858, actualAmount: 3858, shortAmount: 0, additionalPayments: [], status: PaymentStatus.PAID, isLocked: true, proofImages: [] }
     ]
   }
 ];
@@ -74,7 +76,8 @@ export const mockInvestors: Investor[] = [
       { month: 'Apr', profit: 16500 },
       { month: 'May', profit: 15000 },
       { month: 'Jun', profit: 18000 },
-    ]
+    ],
+    withdrawals: []
   },
   {
     id: 'inv2',
@@ -92,7 +95,8 @@ export const mockInvestors: Investor[] = [
       { month: 'Apr', profit: 3100 },
       { month: 'May', profit: 4500 },
       { month: 'Jun', profit: 5200 },
-    ]
+    ],
+    withdrawals: []
   }
 ];
 

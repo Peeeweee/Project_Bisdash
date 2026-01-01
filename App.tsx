@@ -1,4 +1,5 @@
 
+
 import React, { useState, useMemo } from 'react';
 import Sidebar from './components/UI/Sidebar';
 import StatCard from './components/UI/StatCard';
@@ -104,6 +105,7 @@ const App: React.FC = () => {
   const [isExtendModalOpen, setIsExtendModalOpen] = useState(false);
   const [extensionMonths, setExtensionMonths] = useState(1);
   const [transactionsView, setTransactionsView] = useState<'customer' | 'investor'>('customer');
+  const [cancellingExtensionId, setCancellingExtensionId] = useState<string | null>(null);
 
   const [baseInvestors, setBaseInvestors] = useState<Investor[]>(initialInvestors);
   const [customers, setCustomers] = useState<Customer[]>(initialCustomers.map(c => ({
@@ -116,19 +118,44 @@ const App: React.FC = () => {
       const myCustomers = customers.filter(c => c.moneyOwner === investor.name);
       const totalPrincipalEverLoaned = myCustomers.reduce((acc, c) => acc + c.principalAmount, 0);
       const totalInterestProfit = myCustomers.reduce((acc, c) => {
-        const interestPortionPerCycle = c.totalInterest / (c.durationMonths * 2);
-        return acc + c.payments.reduce((sum, p) => {
-          if (p.status === PaymentStatus.PAID || p.status === PaymentStatus.ADVANCE || p.status === PaymentStatus.LATE) return sum + interestPortionPerCycle;
-          if (p.status === PaymentStatus.SHORT) return sum + (interestPortionPerCycle * (p.actualAmount / p.expectedAmount));
+        const extensions = c.extensions || [];
+        const totalExtensionInterest = extensions.reduce((sum, e) => sum + e.addedInterest, 0);
+        const totalExtensionMonths = extensions.reduce((sum, e) => sum + e.addedMonths, 0);
+
+        // Calculate Base Metrics (Original Loan without active extensions)
+        const currentDuration = c.durationMonths;
+        const initialDuration = Math.max(1, currentDuration - totalExtensionMonths);
+        const baseCycles = initialDuration * 2;
+        const baseTotalInterest = Math.max(0, c.totalInterest - totalExtensionInterest);
+        const basePortionPerCycle = baseTotalInterest / baseCycles;
+
+        // 1. Profit from Base Cycles (Realized via Payment)
+        const realizedBaseProfit = c.payments.reduce((sum, p, index) => {
+          // Ignore payments that belong to extension slots for *base* profit calculation
+          // (Logic: Extension profit is booked separately below)
+          if (index >= baseCycles) return sum;
+          if (!p) return sum;
+
+          if (p.status === PaymentStatus.PAID || p.status === PaymentStatus.ADVANCE || p.status === PaymentStatus.LATE) {
+            return sum + basePortionPerCycle;
+          }
+          if (p.status === PaymentStatus.SHORT && p.expectedAmount > 0) {
+            return sum + (basePortionPerCycle * (p.actualAmount / p.expectedAmount));
+          }
           return sum;
         }, 0);
+
+        // 2. Profit from Extensions (Recognized Immediately as Fee/Gain)
+        // This satisfies the user requirement to see "Money Gained" update immediately on extension.
+        return acc + realizedBaseProfit + totalExtensionInterest;
       }, 0);
 
       const totalCashEverReturned = myCustomers.reduce((acc, c) => {
         return acc + c.payments.reduce((sum, p) => sum + (p?.actualAmount || 0), 0);
       }, 0);
 
-      const available = investor.initialCapital - totalPrincipalEverLoaned + totalCashEverReturned;
+      const totalWithdrawn = investor.withdrawals ? investor.withdrawals.reduce((acc, w) => acc + w.amount, 0) : 0;
+      const available = investor.initialCapital - totalPrincipalEverLoaned + totalCashEverReturned - totalWithdrawn;
       const roi = investor.initialCapital > 0 ? (totalInterestProfit / investor.initialCapital) * 100 : 0;
 
       return {
@@ -280,7 +307,11 @@ const App: React.FC = () => {
           durationMonths: newDuration,
           totalInterest: newTotalInterest,
           totalPayable: newTotalPayable,
-          remainingBalance: newRemaining
+          remainingBalance: newRemaining,
+          extensions: [
+            ...(c.extensions || []),
+            { id: `ext-${Date.now()}`, date: new Date().toISOString(), addedMonths: extraMonths, addedInterest: addedInterest }
+          ]
         };
       }
       return c;
@@ -290,6 +321,46 @@ const App: React.FC = () => {
     const updatedSelected = updatedCustomers.find(c => c.id === selectedCustomer.id);
     if (updatedSelected) setSelectedCustomer(updatedSelected);
     setIsExtendModalOpen(false);
+  };
+
+  const handleCancelExtension = (extId: string) => {
+    setCancellingExtensionId(extId);
+  };
+
+  const confirmCancelExtension = () => {
+    if (!selectedCustomer || !cancellingExtensionId) return;
+
+    // Find the extension to revert
+    const extensionToRemove = selectedCustomer.extensions?.find(e => e.id === cancellingExtensionId);
+    if (!extensionToRemove) return;
+
+    const updatedCustomers = customers.map(c => {
+      if (c.id === selectedCustomer.id) {
+        // Revert values
+        const newDuration = c.durationMonths - extensionToRemove.addedMonths;
+        const newTotalInterest = c.totalInterest - extensionToRemove.addedInterest;
+        const newTotalPayable = c.totalPayable - extensionToRemove.addedInterest;
+        const newRemaining = Math.max(0, c.remainingBalance - extensionToRemove.addedInterest);
+
+        // Remove from array
+        const newExtensions = c.extensions?.filter(e => e.id !== cancellingExtensionId) || [];
+
+        return {
+          ...c,
+          durationMonths: newDuration,
+          totalInterest: newTotalInterest,
+          totalPayable: newTotalPayable,
+          remainingBalance: newRemaining,
+          extensions: newExtensions
+        };
+      }
+      return c;
+    });
+
+    setCustomers(updatedCustomers);
+    const updatedSelected = updatedCustomers.find(c => c.id === selectedCustomer.id);
+    if (updatedSelected) setSelectedCustomer(updatedSelected);
+    setCancellingExtensionId(null);
   };
 
   const openVerifyModal = (slotIndex: number, currentPayment?: PaymentEntry) => {
@@ -468,7 +539,8 @@ const App: React.FC = () => {
       availableCapital: newInvestor.initialCapital,
       activeBatches: 0,
       roi: 0,
-      performanceHistory: []
+      performanceHistory: [],
+      withdrawals: []
     };
     setBaseInvestors([...baseInvestors, inv]);
     setIsAddingInvestor(false);
@@ -736,6 +808,35 @@ const App: React.FC = () => {
     );
   };
 
+  const renderCancelExtensionModal = () => {
+    if (!cancellingExtensionId || !selectedCustomer) return null;
+
+    const extension = selectedCustomer.extensions?.find(e => e.id === cancellingExtensionId);
+    if (!extension) return null;
+
+    return (
+      <div className="fixed inset-0 z-[300] flex items-center justify-center p-6 italic">
+        <div className="absolute inset-0 bg-slate-900/80 backdrop-blur-md italic" onClick={() => setCancellingExtensionId(null)}></div>
+        <div className="relative bg-white rounded-[3rem] p-10 max-w-md w-full shadow-2xl italic animate-in zoom-in-95 duration-300 flex flex-col gap-6 text-center border-4 border-rose-50">
+
+          <div className="w-24 h-24 bg-rose-100 rounded-full flex items-center justify-center text-4xl mx-auto shadow-inner text-rose-500">
+            ⚠
+          </div>
+
+          <div className="italic">
+            <h3 className="text-3xl font-black text-slate-900 italic tracking-tight mb-2">Cancel Extension?</h3>
+            <p className="text-slate-500 font-medium italic mb-6">This will revert the added <span className="text-slate-900 font-bold">{extension.addedMonths} months</span> and <span className="text-slate-900 font-bold">{formatCurrency(extension.addedInterest)}</span> interest.</p>
+          </div>
+
+          <div className="space-y-3 italic">
+            <button onClick={confirmCancelExtension} className="w-full py-5 bg-rose-500 text-white rounded-[2rem] font-black text-lg hover:bg-rose-600 shadow-xl shadow-rose-200 transition-all italic active:scale-95">Yes, Cancel It</button>
+            <button onClick={() => setCancellingExtensionId(null)} className="w-full py-5 bg-white text-slate-400 border border-slate-200 rounded-[2rem] font-black text-lg hover:bg-slate-50 transition-all italic">No, Keep It</button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   // --- Investors Tab ---
   const renderInvestorsPage = () => {
     const pieData = derivedInvestors.map(inv => ({ name: inv.name, value: inv.initialCapital }));
@@ -854,72 +955,256 @@ const App: React.FC = () => {
   // --- Transactions Tab ---
   // --- Transactions Tab ---
   const renderTransactionsPage = () => (
-    <div className="space-y-10 animate-in fade-in slide-in-from-bottom-6 duration-700 italic">
-      <div className="flex flex-col gap-6 italic">
-        <div className="flex justify-between items-end">
-          <div className="italic">
-            <h2 className="text-5xl font-black text-slate-900 tracking-tight italic">Money Feed</h2>
-            <p className="text-slate-500 mt-2 text-lg font-medium italic">Track flow of funds across the system.</p>
-          </div>
-          <div className="flex bg-slate-100 p-1.5 rounded-2xl italic">
-            <button onClick={() => setTransactionsView('customer')} className={`px-8 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all italic ${transactionsView === 'customer' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}>Customer Payments</button>
-            <button onClick={() => setTransactionsView('investor')} className={`px-8 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all italic ${transactionsView === 'investor' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}>Investor Ledger</button>
+    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-6 duration-700 italic h-full flex flex-col">
+      <div className="italic shrink-0">
+        <h2 className="text-5xl font-black text-slate-900 tracking-tight italic">Money Feed & Ledger</h2>
+        <p className="text-slate-500 mt-2 text-lg font-medium italic">Complete ecosystem overview: Customers, Collections, Gains, and Capital.</p>
+      </div>
+
+      <div className="grid grid-cols-1 xl:grid-cols-4 gap-6 flex-1 min-h-0 italic">
+
+        {/* Partition 1: Active Loan Portfolio (Customer List) */}
+        <div className="flex flex-col gap-4 italic h-full xl:col-span-1">
+          <h3 className="text-sm font-black text-slate-400 italic uppercase tracking-widest flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-slate-400"></span> Portfolio
+          </h3>
+          <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm flex-1 overflow-hidden flex flex-col italic">
+            <div className="p-6 border-b border-slate-50 italic">
+              <p className="text-[10px] font-bold text-slate-400 uppercase">Active Borrowers ({customers.length})</p>
+            </div>
+            <div className="overflow-auto flex-1 p-2 custom-scrollbar space-y-2">
+              {customers.map(c => (
+                <div key={c.id} className={`p-5 rounded-[2rem] transition-all cursor-default group border ${c.isCompleted ? 'bg-white border-emerald-100 shadow-emerald-50 shadow-lg' : 'hover:bg-slate-50 border-transparent hover:border-slate-100'}`}>
+                  {c.isCompleted ? (
+                    // Fully Settled UI
+                    <div className="flex flex-col gap-3 relative overflow-hidden">
+                      <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-bl from-emerald-100 to-transparent -mr-5 -mt-5 rounded-full blur-xl pointer-events-none"></div>
+                      <div className="flex justify-between items-start z-10">
+                        <div>
+                          <p className="font-black text-slate-800 text-lg italic tracking-tight">{c.name}</p>
+                          <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest mt-1">Started {formatDate(c.startDate)}</p>
+                        </div>
+                        <button onClick={() => { setSelectedCustomer(c); setCurrentTab('customers'); }} className="px-3 py-1 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-xl text-[8px] font-black uppercase tracking-widest border border-slate-200 transition-colors">Open File</button>
+                      </div>
+
+                      <div className="flex items-center justify-between mt-1 z-10">
+                        <div>
+                          <p className="text-[12px] font-black text-emerald-600 italic">Fully Settled</p>
+                          <div className="w-12 h-1 bg-emerald-500 rounded-full mt-1"></div>
+                        </div>
+                        <span className="bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest">Done</span>
+                      </div>
+
+                      <div className="flex justify-between items-end mt-2 z-10 pt-3 border-t border-emerald-50/50">
+                        <div>
+                          <p className="text-[7px] font-bold text-slate-400 uppercase tracking-widest">Capital Base</p>
+                          <p className="text-sm font-black text-slate-700">{formatCurrency(c.principalAmount)}</p>
+                        </div>
+                        <p className="text-[8px] font-bold text-slate-300 uppercase tracking-widest text-right">{c.moneyOwner}</p>
+                      </div>
+                    </div>
+                  ) : (
+                    // Active Loan UI
+                    <>
+                      <div className="flex justify-between items-start mb-1">
+                        <p className="font-black text-slate-900 text-sm truncate">{c.name}</p>
+                        <span className="px-2 py-0.5 rounded-full text-[7px] font-black uppercase bg-blue-50 text-blue-600">Active</span>
+                      </div>
+                      <p className="text-[9px] font-bold text-slate-400 uppercase truncate">Pool: {c.moneyOwner}</p>
+                      <div className="mt-3 flex justify-between items-end">
+                        <div>
+                          <p className="text-[8px] font-bold text-slate-400 uppercase">Principal</p>
+                          <p className="text-xs font-black text-slate-700">{formatCurrency(c.principalAmount)}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-[8px] font-bold text-slate-400 uppercase">Balance</p>
+                          <p className="text-xs font-black text-rose-500">{formatCurrency(c.remainingBalance)}</p>
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </div>
+              ))}
+              {customers.length === 0 && <p className="text-center py-10 text-slate-300 text-xs font-bold italic">No active portfolio.</p>}
+            </div>
           </div>
         </div>
 
-        {transactionsView === 'customer' ? (
-          <div className="bg-white rounded-[3rem] border border-slate-100 shadow-sm overflow-hidden italic">
-            <div className="p-8 border-b border-slate-50 flex justify-end">
-              <div className="flex bg-slate-50 p-2 rounded-[1.8rem] border border-slate-100 italic">
-                {['ALL', 'PAID', 'SHORT', 'ADVANCE', 'LATE'].map(f => (
-                  <button key={f} onClick={() => setTransactionFilter(f as any)} className={`px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all italic whitespace-nowrap ${transactionFilter === f ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-400 hover:text-slate-600'}`}>{f}</button>
+        {/* Partition 2: Customer Collections (Money Feed) */}
+        <div className="flex flex-col gap-4 italic h-full xl:col-span-1">
+          <h3 className="text-sm font-black text-emerald-500 italic uppercase tracking-widest flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-emerald-500"></span> Collections
+          </h3>
+          <div className="bg-white rounded-[2.5rem] border border-emerald-100/50 shadow-sm flex-1 overflow-hidden flex flex-col italic relative">
+            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-emerald-400 to-emerald-200"></div>
+            <div className="p-4 border-b border-slate-50 flex overflow-x-auto italic shrink-0 no-scrollbar">
+              <div className="flex bg-slate-50 p-1 rounded-xl border border-slate-100 italic gap-1">
+                {['ALL', 'PAID', 'SHORT'].map(f => (
+                  <button key={f} onClick={() => setTransactionFilter(f as any)} className={`px-3 py-1.5 rounded-lg text-[8px] font-black uppercase tracking-widest transition-all italic whitespace-nowrap ${transactionFilter === f ? 'bg-slate-900 text-white shadow-md' : 'text-slate-400 hover:text-slate-600'}`}>{f}</button>
                 ))}
               </div>
             </div>
-            <table className="w-full text-left border-collapse italic">
-              <thead>
-                <tr className="bg-slate-50/50 font-black uppercase text-[10px] tracking-widest text-slate-400 italic">
-                  <th className="px-10 py-6 italic">Customer</th>
-                  <th className="px-10 py-6 italic">Date Collected</th>
-                  <th className="px-10 py-6 italic">Money In</th>
-                  <th className="px-10 py-6 italic">Verified Spot</th>
-                  <th className="px-10 py-6 italic">Status</th>
-                  <th className="px-10 py-6 italic">Receipt</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 italic">
+            <div className="overflow-auto flex-1 italic custom-scrollbar">
+              <div className="divide-y divide-slate-50">
                 {filteredTransactions.map((tx) => (
-                  <tr key={tx.id} className="hover:bg-slate-50/80 transition-all group italic">
-                    <td className="px-10 py-8 italic"><div><p className="font-black text-slate-900 text-lg italic">{tx.customerName}</p><p className="text-[10px] font-bold text-slate-400 uppercase italic">From {tx.investorPool}'s Pool</p></div></td>
-                    <td className="px-10 py-8 italic"><p className="font-bold text-slate-600 italic">{formatDate(tx.date)}</p><p className="text-[10px] font-medium text-slate-400 italic">{tx.verifiedAt?.split(' ')[1] || '12:00'}</p></td>
-                    <td className="px-10 py-8 italic"><p className="font-black text-slate-900 text-xl tracking-tighter italic">{formatCurrency(tx.actualAmount)}</p>{tx.shortAmount > 0 && <p className="text-[9px] font-black text-red-500 uppercase italic">Short by {formatCurrency(tx.shortAmount)}</p>}</td>
-                    <td className="px-10 py-8 italic"><div className="flex items-center gap-2 italic"><span className="text-emerald-500 italic">📍</span><p className="font-bold text-slate-500 text-sm italic">{tx.location || 'Not recorded'}</p></div></td>
-                    <td className="px-10 py-8 italic"><span className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest italic ${tx.status === PaymentStatus.PAID ? 'bg-emerald-100 text-emerald-700' : tx.status === PaymentStatus.SHORT ? 'bg-amber-100 text-amber-700' : tx.status === PaymentStatus.ADVANCE ? 'bg-emerald-200 text-emerald-900' : 'bg-rose-100 text-rose-700'}`}>{tx.status}</span></td>
-                    <td className="px-10 py-8 italic">
-                      {tx.proofImages && tx.proofImages.length > 0 ? (
-                        <div className="flex -space-x-4 hover:space-x-1 transition-all">
-                          {tx.proofImages.map((img, idx) => (
-                            <button key={idx} onClick={() => window.open(img, '_blank')} className="w-10 h-10 rounded-xl bg-slate-100 border-2 border-white shadow-sm flex items-center justify-center hover:scale-110 transition-transform overflow-hidden relative z-10">
-                              <img src={img} alt="proof" className="w-full h-full object-cover" />
-                            </button>
+                  <div key={tx.id} className="p-5 hover:bg-emerald-50/30 transition-colors group">
+                    <div className="flex justify-between items-start mb-2">
+                      <div>
+                        <p className="font-bold text-slate-900 text-xs">{tx.customerName}</p>
+                        <p className="text-[8px] font-bold text-slate-400 uppercase">{formatDate(tx.date)}</p>
+                      </div>
+                      <span className={`px-2 py-0.5 rounded-full text-[7px] font-black uppercase ${tx.status === PaymentStatus.PAID ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>{tx.status}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <p className="text-lg font-black text-slate-800 tracking-tighter">{formatCurrency(tx.actualAmount)}</p>
+                      {tx.proofImages && tx.proofImages.length > 0 && (
+                        <div className="flex -space-x-2">
+                          {tx.proofImages.slice(0, 3).map((img, i) => (
+                            <div key={i} className="w-6 h-6 rounded-full border border-white bg-slate-100 overflow-hidden relative z-10">
+                              <img src={img} className="w-full h-full object-cover" />
+                            </div>
                           ))}
                         </div>
-                      ) : (
-                        <span className="text-slate-300 italic text-sm font-medium italic">No proof</span>
                       )}
-                    </td>
-                  </tr>
+                    </div>
+                  </div>
                 ))}
-              </tbody>
-            </table>
-            {filteredTransactions.length === 0 && (<div className="py-24 text-center italic"><p className="text-slate-400 font-bold italic">No transactions found for this filter.</p></div>)}
+                {filteredTransactions.length === 0 && <p className="text-center py-10 text-slate-300 text-xs font-bold italic">No collections found.</p>}
+              </div>
+            </div>
           </div>
-        ) : (
-          <div className="italic p-20 text-center bg-slate-50 rounded-[3rem] border-2 border-dashed border-slate-200">
-            <p className="text-slate-400 font-bold italic">Investor Ledger Feature Coming Soon</p>
-            <p className="text-sm text-slate-300 mt-2 italic">Tracking capital injections and withdrawals.</p>
+        </div>
+
+        {/* Partition 3: Investor Growth (Money Gain) - NEW */}
+        <div className="flex flex-col gap-4 italic h-full xl:col-span-1">
+          <h3 className="text-sm font-black text-blue-500 italic uppercase tracking-widest flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-blue-500"></span> Gains
+          </h3>
+          <div className="bg-white rounded-[2.5rem] border border-blue-100/50 shadow-sm flex-1 overflow-hidden flex flex-col italic relative">
+            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-400 to-indigo-400"></div>
+            <div className="p-6 border-b border-slate-50 italic">
+              <p className="text-[10px] font-bold text-slate-400 uppercase">Total Profit Generated</p>
+              <p className="text-3xl font-black text-slate-900 mt-2">{formatCurrency(derivedInvestors.reduce((acc, inv) => acc + inv.totalGained, 0))}</p>
+            </div>
+            <div className="overflow-auto flex-1 p-2 custom-scrollbar space-y-2">
+              {derivedInvestors.map(inv => (
+                <div key={inv.id} className="p-4 rounded-3xl bg-slate-50/50 border border-slate-100">
+                  <div className="flex justify-between items-start mb-3">
+                    <div>
+                      <p className="font-black text-slate-700 text-xs">{inv.name}</p>
+                      <p className="text-[8px] font-bold text-slate-400 uppercase mt-0.5">Pool: {formatCurrency(inv.initialCapital)}</p>
+                    </div>
+                    <span className="text-[9px] font-black text-blue-500 bg-blue-100 px-2 py-0.5 rounded-full">+{inv.roi}% ROI</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-center mb-3">
+                    <div className="bg-white p-2 rounded-2xl">
+                      <p className="text-[7px] font-bold text-slate-400 uppercase">Deployed</p>
+                      <p className="text-[10px] font-black text-slate-800">{formatCurrency(inv.totalInvested)}</p>
+                    </div>
+                    <div className="bg-emerald-50 p-2 rounded-2xl">
+                      <p className="text-[7px] font-bold text-emerald-600 uppercase">Profit</p>
+                      <p className="text-[10px] font-black text-emerald-600">+{formatCurrency(inv.totalGained)}</p>
+                    </div>
+                  </div>
+                  <div className="bg-slate-900 rounded-2xl p-3 flex justify-between items-center text-white">
+                    <div>
+                      <p className="text-[7px] font-bold text-slate-400 uppercase tracking-widest">Current Fund</p>
+                      <p className="text-xs font-black">{formatCurrency(inv.availableCapital)}</p>
+                    </div>
+                    <div className="w-8 h-8 rounded-full bg-emerald-500/20 flex items-center justify-center text-emerald-400">
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 4v16m0 0l-4-4m4 4l4-4" /></svg>
+                    </div>
+                  </div>
+
+                </div>
+              ))}
+            </div>
           </div>
-        )}
+        </div>
+
+        {/* Partition 4: Investor Ledger (Capital Flow) */}
+        <div className="flex flex-col gap-4 italic h-full xl:col-span-1">
+          <h3 className="text-sm font-black text-amber-500 italic uppercase tracking-widest flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-amber-500"></span> Ledger
+          </h3>
+          <div className="bg-white rounded-[2.5rem] border border-amber-100/50 shadow-sm flex-1 overflow-hidden flex flex-col italic relative">
+            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-amber-400 to-rose-400"></div>
+            <div className="p-6 border-b border-slate-50 italic">
+              <p className="text-[10px] font-bold text-slate-400 uppercase">Capital Flow (In/Out)</p>
+            </div>
+            <div className="overflow-auto flex-1 italic custom-scrollbar">
+              <div className="divide-y divide-slate-50">
+                {[
+                  ...customers.map(c => ({
+                    id: c.id,
+                    date: new Date(c.startDate).getTime(),
+                    type: 'DISBURSAL',
+                    amount: c.principalAmount,
+                    label: `Loan to ${c.name}`,
+                    pool: c.moneyOwner
+                  })),
+                  ...baseInvestors.map(inv => {
+                    // Fix: Use mock dates for initial mock data, otherwise parse timestamp from ID
+                    let date = Date.now();
+                    if (inv.id === 'inv1') date = new Date('2025-01-01').getTime();
+                    else if (inv.id === 'inv2') date = new Date('2025-02-15').getTime();
+                    else {
+                      const parsed = parseInt(inv.id.split('-')[1]);
+                      if (!isNaN(parsed) && parsed > 1600000000000) date = parsed;
+                    }
+
+                    return {
+                      id: inv.id,
+                      date: date,
+                      type: 'INJECTION',
+                      amount: inv.initialCapital,
+                      label: 'Capital Injection',
+                      pool: inv.name
+                    };
+                  }),
+                  ...baseInvestors.flatMap(inv => (inv.withdrawals || []).map(w => ({
+                    id: w.id,
+                    date: new Date(w.date).getTime(),
+                    type: 'WITHDRAWAL',
+                    amount: w.amount,
+                    label: 'Capital Withdrawal',
+                    pool: inv.name
+                  }))),
+                  ...customers.flatMap(c => (c.extensions || []).map(ext => ({
+                    id: ext.id,
+                    date: new Date(ext.date).getTime(),
+                    type: 'EXTENSION',
+                    amount: ext.addedInterest,
+                    label: `Extended ${c.name} (+${ext.addedMonths}mo)`,
+                    pool: c.moneyOwner
+                  })))
+                ]
+                  .sort((a, b) => b.date - a.date)
+                  .map((entry) => (
+                    <div key={entry.id} className={`p-5 transition-colors ${entry.type === 'INJECTION' ? 'hover:bg-emerald-50/30' : entry.type === 'WITHDRAWAL' ? 'hover:bg-indigo-50/30' : entry.type === 'EXTENSION' ? 'hover:bg-blue-50/30' : 'hover:bg-amber-50/30'}`}>
+                      <div className="flex justify-between items-start mb-1">
+                        <span className="text-[8px] font-bold text-slate-400 uppercase">{formatDate(new Date(entry.date).toISOString())}</span>
+                        <span className={`px-2 py-0.5 rounded-full text-[7px] font-black uppercase ${entry.type === 'INJECTION' ? 'bg-emerald-100 text-emerald-700' : entry.type === 'WITHDRAWAL' ? 'bg-indigo-100 text-indigo-700' : entry.type === 'EXTENSION' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'}`}>
+                          {entry.type === 'INJECTION' ? 'CAPITAL IN' : entry.type === 'WITHDRAWAL' ? 'WITHDRAWAL' : entry.type === 'EXTENSION' ? 'LOAN EXTENDED' : 'LOAN OUT'}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center mt-2">
+                        <div>
+                          <p className="font-bold text-slate-900 text-xs">{entry.label}</p>
+                          <p className="text-[8px] font-medium text-slate-400 uppercase truncate max-w-[100px]">Pool: {entry.pool}</p>
+                        </div>
+                        <p className={`text-base font-black tracking-tighter ${entry.type === 'INJECTION' ? 'text-emerald-500' : entry.type === 'WITHDRAWAL' ? 'text-indigo-500' : entry.type === 'EXTENSION' ? 'text-blue-500' : 'text-rose-500'}`}>
+                          {entry.type === 'INJECTION' || entry.type === 'EXTENSION' ? '+' : '-'}{formatCurrency(entry.amount)}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                {customers.length === 0 && baseInvestors.length === 0 && <p className="text-center py-10 text-slate-300 text-xs font-bold italic">No ledger activity.</p>}
+              </div>
+            </div>
+          </div>
+        </div>
+
       </div>
     </div>
   );
@@ -952,9 +1237,31 @@ const App: React.FC = () => {
             </div>
           </div>
           {!customer.isCompleted && (
-            <button onClick={handleExtendLoan} className="px-8 py-4 bg-white border border-slate-200 rounded-2xl font-black text-slate-700 hover:bg-amber-50 hover:border-amber-200 transition-all shadow-sm italic flex items-center gap-3 italic">
-              <span className="text-lg italic">🕒</span> Extend Loan
-            </button>
+            <div className="flex flex-col items-end gap-3">
+              <button onClick={handleExtendLoan} className="px-8 py-4 bg-white border border-slate-200 rounded-2xl font-black text-slate-700 hover:bg-amber-50 hover:border-amber-200 transition-all shadow-sm italic flex items-center gap-3 italic">
+                <span className="text-lg italic">🕒</span> Extend Loan
+              </button>
+
+              {/* Extensions List */}
+              {customer.extensions && customer.extensions.length > 0 && (
+                <div className="bg-white p-4 rounded-3xl border border-blue-100 shadow-lg shadow-blue-50/50 flex flex-col gap-2 w-64 animate-in fade-in slide-in-from-top-2">
+                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest pl-2">Active Extensions</p>
+                  {customer.extensions.map(ext => (
+                    <div key={ext.id} className="flex justify-between items-center bg-blue-50/50 p-2 rounded-2xl border border-blue-100 group">
+                      <div className="pl-2">
+                        <p className="text-[10px] font-black text-slate-700">+{ext.addedMonths} Month{ext.addedMonths > 1 ? 's' : ''}</p>
+                        <p className="text-[8px] font-bold text-slate-400 uppercase">{formatDate(ext.date)}</p>
+                      </div>
+                      <button
+                        onClick={() => handleCancelExtension(ext.id)}
+                        className="bg-white text-rose-500 hover:bg-rose-50 border border-slate-100 px-3 py-1.5 rounded-xl text-[8px] font-black uppercase tracking-widest hover:border-rose-200 transition-colors shadow-sm">
+                        Cancel
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           )}
         </div>
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 italic">
@@ -1055,6 +1362,7 @@ const App: React.FC = () => {
         {renderSettlementModal()}
         {renderVoidModal()}
         {renderExtendModal()}
+        {renderCancelExtensionModal()}
 
         {/* --- Adding New Customer Loan --- */}
         {isAddingNew && (
