@@ -106,6 +106,9 @@ const App: React.FC = () => {
   const [extensionMonths, setExtensionMonths] = useState(1);
   const [transactionsView, setTransactionsView] = useState<'customer' | 'investor'>('customer');
   const [cancellingExtensionId, setCancellingExtensionId] = useState<string | null>(null);
+  const [isWithdrawModalOpen, setIsWithdrawModalOpen] = useState(false);
+  const [withdrawingInvestor, setWithdrawingInvestor] = useState<Investor | null>(null);
+  const [withdrawAmount, setWithdrawAmount] = useState<string>('');
 
   const [baseInvestors, setBaseInvestors] = useState<Investor[]>(initialInvestors);
   const [customers, setCustomers] = useState<Customer[]>(initialCustomers.map(c => ({
@@ -453,26 +456,124 @@ const App: React.FC = () => {
   };
 
   const handleWithdrawFunds = (investor: Investor) => {
-    const amountStr = window.prompt(`How much would you like to withdraw from ${investor.name}'s available capital?\nAvailable: ${formatCurrency(investor.availableCapital)}`);
-    if (amountStr === null) return;
+    setWithdrawingInvestor(investor);
+    setWithdrawAmount('');
+    setIsWithdrawModalOpen(true);
+  };
 
-    const amount = parseFloat(amountStr);
+  const confirmWithdrawal = () => {
+    if (!withdrawingInvestor) return;
+
+    const amount = parseFloat(withdrawAmount);
     if (isNaN(amount) || amount <= 0) {
       alert("Please enter a valid amount.");
       return;
     }
 
-    if (amount > investor.availableCapital) {
-      alert("You cannot withdraw more than the available capital.");
+    if (amount > withdrawingInvestor.availableCapital) {
+      alert(`Insufficient Funds: You can only withdraw up to ${formatCurrency(withdrawingInvestor.availableCapital)} from this pool.`);
       return;
     }
 
+    // Logical Rule: No Total Withdraw if a money is loaned to someone
+    if (withdrawingInvestor.activeBatches > 0 && amount >= withdrawingInvestor.availableCapital) {
+      alert("⚠️ Operational Restriction: Total withdrawal is not permitted while there are active loan cycles. Please leave funds to cover ongoing borrowed capital.");
+      return;
+    }
+
+    const newWithdrawal = {
+      id: `wth-${Date.now()}`,
+      date: new Date().toISOString(),
+      amount: amount
+    };
+
     const updatedInvestors = baseInvestors.map(inv => {
-      if (inv.id === investor.id) return { ...inv, initialCapital: inv.initialCapital - amount };
+      if (inv.id === withdrawingInvestor.id) {
+        return {
+          ...inv,
+          withdrawals: [...(inv.withdrawals || []), newWithdrawal]
+        };
+      }
       return inv;
     });
+
     setBaseInvestors(updatedInvestors);
-    alert(`Successfully withdrawn ${formatCurrency(amount)} from ${investor.name}'s account.`);
+    setIsWithdrawModalOpen(false);
+    setWithdrawingInvestor(null);
+  };
+
+  const renderWithdrawModal = () => {
+    if (!isWithdrawModalOpen || !withdrawingInvestor) return null;
+
+    const currentVal = parseFloat(withdrawAmount) || 0;
+    const isTotalWithdraw = withdrawingInvestor.activeBatches > 0 && currentVal >= withdrawingInvestor.availableCapital;
+
+    return (
+      <div className="fixed inset-0 z-[300] flex items-center justify-center p-6 italic">
+        <div className="absolute inset-0 bg-slate-900/80 backdrop-blur-md" onClick={() => setIsWithdrawModalOpen(false)}></div>
+        <div className="relative bg-white rounded-[3.5rem] p-12 max-w-lg w-full shadow-2xl animate-in zoom-in-95 duration-300 flex flex-col gap-10 border border-slate-100">
+
+          <div className="flex justify-between items-start">
+            <div>
+              <h3 className="text-4xl font-black text-slate-900 tracking-tight italic mb-1">Withdraw</h3>
+              <p className="text-emerald-600 font-bold uppercase tracking-[0.2em] text-[10px] italic">From {withdrawingInvestor.name}'s Pool</p>
+            </div>
+            <div className="w-16 h-16 bg-slate-50 rounded-3xl flex items-center justify-center text-3xl shadow-inner border border-slate-100">💰</div>
+          </div>
+
+          <div className="space-y-8 italic">
+            <div className="grid grid-cols-2 gap-4 italic font-black">
+              <div className="p-6 bg-slate-50 rounded-[2rem] border border-slate-100 shadow-inner italic">
+                <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2 italic">Available</p>
+                <p className="text-xl font-black text-slate-900 italic">{formatCurrency(withdrawingInvestor.availableCapital)}</p>
+              </div>
+              <div className="p-6 bg-blue-50/50 rounded-[2rem] border border-blue-100 italic">
+                <p className="text-[10px] font-black uppercase text-blue-600 tracking-widest mb-2 italic">Working Now</p>
+                <p className="text-xl font-black text-blue-900 italic">{withdrawingInvestor.activeBatches} Loans</p>
+              </div>
+            </div>
+
+            <div className="space-y-4 italic">
+              <label className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] italic ml-1 italic">Enter Amount (PHP)</label>
+              <div className="relative italic">
+                <input
+                  required
+                  type="number"
+                  autoFocus
+                  value={withdrawAmount}
+                  onChange={(e) => setWithdrawAmount(e.target.value)}
+                  className={`w-full px-10 py-8 rounded-[2.5rem] font-black text-4xl tabular-nums transition-all border-none focus:ring-4 italic ${isTotalWithdraw ? 'bg-rose-50 text-rose-600 focus:ring-rose-200' : 'bg-slate-50 text-slate-900 focus:ring-emerald-500/20'}`}
+                  placeholder="0.00"
+                />
+                <span className="absolute right-10 top-1/2 -translate-y-1/2 text-slate-300 font-black text-xl italic uppercase">PHP</span>
+              </div>
+              {isTotalWithdraw && (
+                <div className="bg-rose-50 border border-rose-100 rounded-2xl p-4 flex items-center justify-center gap-3 italic animate-bounce">
+                  <span className="text-rose-500 text-lg italic">⚠️</span>
+                  <p className="text-[9px] font-black text-rose-600 uppercase tracking-widest italic">Total Withdraw Blocked (Active Loans Found)</p>
+                </div>
+              )}
+            </div>
+
+            <div className="flex flex-col gap-4 italic">
+              <button
+                onClick={confirmWithdrawal}
+                disabled={isTotalWithdraw || currentVal <= 0}
+                className={`w-full py-8 rounded-[2.5rem] font-black text-2xl shadow-2xl transition-all active:scale-95 italic ${isTotalWithdraw || currentVal <= 0 ? 'bg-slate-100 text-slate-300 cursor-not-allowed' : 'bg-slate-900 text-white hover:bg-emerald-600 shadow-emerald-200'}`}
+              >
+                Release Capital
+              </button>
+              <button
+                onClick={() => setIsWithdrawModalOpen(false)}
+                className="w-full py-5 bg-white text-slate-300 rounded-[2rem] font-black text-sm uppercase tracking-[0.3em] hover:text-slate-900 transition-colors italic"
+              >
+                Go Back
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
   };
 
   const handleRequestUnlock = (slotIndex: number) => {
@@ -1144,7 +1245,6 @@ const App: React.FC = () => {
                     pool: c.moneyOwner
                   })),
                   ...baseInvestors.map(inv => {
-                    // Fix: Use mock dates for initial mock data, otherwise parse timestamp from ID
                     let date = Date.now();
                     if (inv.id === 'inv1') date = new Date('2025-01-01').getTime();
                     else if (inv.id === 'inv2') date = new Date('2025-02-15').getTime();
@@ -1158,7 +1258,7 @@ const App: React.FC = () => {
                       date: date,
                       type: 'INJECTION',
                       amount: inv.initialCapital,
-                      label: 'Capital Injection',
+                      label: `Initial Capital: ${inv.name}`,
                       pool: inv.name
                     };
                   }),
@@ -1167,7 +1267,7 @@ const App: React.FC = () => {
                     date: new Date(w.date).getTime(),
                     type: 'WITHDRAWAL',
                     amount: w.amount,
-                    label: 'Capital Withdrawal',
+                    label: `Capital Withdrawal`,
                     pool: inv.name
                   }))),
                   ...customers.flatMap(c => (c.extensions || []).map(ext => ({
@@ -1199,7 +1299,7 @@ const App: React.FC = () => {
                       </div>
                     </div>
                   ))}
-                {customers.length === 0 && baseInvestors.length === 0 && <p className="text-center py-10 text-slate-300 text-xs font-bold italic">No ledger activity.</p>}
+                {(customers.length === 0 && baseInvestors.length === 0) && <p className="text-center py-10 text-slate-300 text-xs font-bold italic">No ledger activity.</p>}
               </div>
             </div>
           </div>
@@ -1363,6 +1463,7 @@ const App: React.FC = () => {
         {renderVoidModal()}
         {renderExtendModal()}
         {renderCancelExtensionModal()}
+        {renderWithdrawModal()}
 
         {/* --- Adding New Customer Loan --- */}
         {isAddingNew && (

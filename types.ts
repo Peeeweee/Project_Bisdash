@@ -4,7 +4,8 @@ export enum PaymentStatus {
   SHORT = 'SHORT',
   OVERDUE = 'OVERDUE',
   ADVANCE = 'ADVANCE',
-  LATE = 'LATE'
+  LATE = 'LATE',
+  WITHDRAWAL = 'WITHDRAWAL'
 }
 
 export interface PaymentEntry {
