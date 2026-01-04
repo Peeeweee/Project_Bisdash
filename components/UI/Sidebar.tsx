@@ -8,19 +8,19 @@ interface SidebarProps {
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ currentTab, onTabChange, isAdmin }) => {
-  const tabs = isAdmin 
+  const tabs = isAdmin
     ? [
-        { id: 'overview', name: 'Dashboard', icon: '📊' },
-        { id: 'customers', name: 'Customers', icon: '👥' },
-        { id: 'investors', name: 'Investors', icon: '💎' },
-        { id: 'transactions', name: 'Transactions', icon: '💸' },
-        { id: 'reports', name: 'Reports', icon: '📈' },
-        { id: 'settings', name: 'Settings', icon: '⚙️' }
-      ]
+      { id: 'overview', name: 'Dashboard', icon: '📊' },
+      { id: 'customers', name: 'Customers', icon: '👥' },
+      { id: 'investors', name: 'Investors', icon: '💎' },
+      { id: 'transactions', name: 'Transactions', icon: '💸' },
+      { id: 'analytics', name: 'Analytics', icon: '📈' },
+      { id: 'settings', name: 'Settings', icon: '⚙️' }
+    ]
     : [
-        { id: 'overview', name: 'Public Overview', icon: '🌎' },
-        { id: 'login', name: 'Admin Login', icon: '🔒' }
-      ];
+      { id: 'overview', name: 'Public Overview', icon: '🌎' },
+      { id: 'login', name: 'Admin Login', icon: '🔒' }
+    ];
 
   return (
     <div className="w-64 h-screen bg-white border-r border-slate-200 flex flex-col fixed left-0 top-0 z-40">
@@ -34,11 +34,10 @@ const Sidebar: React.FC<SidebarProps> = ({ currentTab, onTabChange, isAdmin }) =
           <button
             key={tab.id}
             onClick={() => onTabChange(tab.id)}
-            className={`w-full flex items-center px-4 py-3 text-sm font-semibold rounded-xl transition-all duration-200 ${
-              currentTab === tab.id
+            className={`w-full flex items-center px-4 py-3 text-sm font-semibold rounded-xl transition-all duration-200 ${currentTab === tab.id
                 ? 'bg-emerald-50 text-emerald-600 shadow-sm shadow-emerald-100'
                 : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'
-            }`}
+              }`}
           >
             <span className="text-lg mr-3">{tab.icon}</span>
             {tab.name}

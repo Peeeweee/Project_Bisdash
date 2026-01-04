@@ -39,6 +39,8 @@ const formatDate = (dateStr: string) => {
 };
 
 // --- Logo Component ---
+const COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
+
 const BisdashLogo = ({ className = "w-12 h-12" }: { className?: string }) => (
   <svg viewBox="0 0 100 100" className={className} fill="none" xmlns="http://www.w3.org/2000/svg">
     <defs>
@@ -109,6 +111,9 @@ const App: React.FC = () => {
   const [isWithdrawModalOpen, setIsWithdrawModalOpen] = useState(false);
   const [withdrawingInvestor, setWithdrawingInvestor] = useState<Investor | null>(null);
   const [withdrawAmount, setWithdrawAmount] = useState<string>('');
+  const [isDepositModalOpen, setIsDepositModalOpen] = useState(false);
+  const [depositingInvestor, setDepositingInvestor] = useState<Investor | null>(null);
+  const [depositAmount, setDepositAmount] = useState<string>('');
 
   const [baseInvestors, setBaseInvestors] = useState<Investor[]>(initialInvestors);
   const [customers, setCustomers] = useState<Customer[]>(initialCustomers.map(c => ({
@@ -158,11 +163,15 @@ const App: React.FC = () => {
       }, 0);
 
       const totalWithdrawn = investor.withdrawals ? investor.withdrawals.reduce((acc, w) => acc + w.amount, 0) : 0;
-      const available = investor.initialCapital - totalPrincipalEverLoaned + totalCashEverReturned - totalWithdrawn;
-      const roi = investor.initialCapital > 0 ? (totalInterestProfit / investor.initialCapital) * 100 : 0;
+      const totalDeposited = investor.deposits ? investor.deposits.reduce((acc, d) => acc + d.amount, 0) : 0;
+
+      const effectiveCapital = investor.initialCapital + totalDeposited;
+      const available = effectiveCapital - totalPrincipalEverLoaned + totalCashEverReturned - totalWithdrawn;
+      const roi = effectiveCapital > 0 ? (totalInterestProfit / effectiveCapital) * 100 : 0;
 
       return {
         ...investor,
+        initialCapital: effectiveCapital, // We update 'initialCapital' to represent the TOTAL pool size
         totalInvested: totalPrincipalEverLoaned,
         totalGained: totalInterestProfit,
         availableCapital: Math.max(0, available),
@@ -175,9 +184,14 @@ const App: React.FC = () => {
   const liveStats = useMemo(() => {
     const totalCap = derivedInvestors.reduce((acc, inv) => acc + inv.initialCapital, 0);
     const totalGained = derivedInvestors.reduce((acc, inv) => acc + inv.totalGained, 0);
+    const totalAvailable = derivedInvestors.reduce((acc, inv) => acc + inv.availableCapital, 0);
+    const totalDeployed = derivedInvestors.reduce((acc, inv) => acc + inv.totalInvested, 0);
+
     return {
       totalManaged: totalCap,
       totalInterestGained: totalGained,
+      totalAvailable: totalAvailable,
+      totalDeployed: totalDeployed,
       activeATMs: customers.filter(c => !c.isCompleted).length,
       monthlyPerformance: businessStats.monthlyPerformance
     };
@@ -576,6 +590,101 @@ const App: React.FC = () => {
     );
   };
 
+  const handleDepositFunds = (investor: Investor) => {
+    setDepositingInvestor(investor);
+    setDepositAmount('');
+    setIsDepositModalOpen(true);
+  };
+
+  const confirmDeposit = () => {
+    if (!depositingInvestor) return;
+
+    const amount = parseFloat(depositAmount);
+    if (isNaN(amount) || amount <= 0) {
+      alert("Please enter a valid amount.");
+      return;
+    }
+
+    const newDeposit = {
+      id: `dep-${Date.now()}`,
+      date: new Date().toISOString(),
+      amount: amount
+    };
+
+    const updatedInvestors = baseInvestors.map(inv => {
+      if (inv.id === depositingInvestor.id) {
+        return {
+          ...inv,
+          deposits: [...(inv.deposits || []), newDeposit]
+        };
+      }
+      return inv;
+    });
+
+    setBaseInvestors(updatedInvestors);
+    setIsDepositModalOpen(false);
+    setDepositingInvestor(null);
+  };
+
+  const renderDepositModal = () => {
+    if (!isDepositModalOpen || !depositingInvestor) return null;
+
+    return (
+      <div className="fixed inset-0 z-[300] flex items-center justify-center p-6 italic">
+        <div className="absolute inset-0 bg-slate-900/80 backdrop-blur-md" onClick={() => setIsDepositModalOpen(false)}></div>
+        <div className="relative bg-white rounded-[3.5rem] p-12 max-w-lg w-full shadow-2xl animate-in zoom-in-95 duration-300 flex flex-col gap-10 border border-slate-100">
+
+          <div className="flex justify-between items-start">
+            <div>
+              <h3 className="text-4xl font-black text-slate-900 tracking-tight italic mb-1">Add Funds</h3>
+              <p className="text-emerald-600 font-bold uppercase tracking-[0.2em] text-[10px] italic">To {depositingInvestor.name}'s Pool</p>
+            </div>
+            <div className="w-16 h-16 bg-emerald-50 rounded-3xl flex items-center justify-center text-3xl shadow-inner border border-emerald-100">📥</div>
+          </div>
+
+          <div className="space-y-8 italic">
+            <div className="bg-slate-50 p-6 rounded-[2rem] border border-slate-100 shadow-inner italic">
+              <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2 italic">Current Total Pool</p>
+              <p className="text-2xl font-black text-slate-900 italic">{formatCurrency(depositingInvestor.initialCapital)}</p>
+            </div>
+
+            <div className="space-y-4 italic">
+              <label className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] italic ml-1 italic">Investment Amount (PHP)</label>
+              <div className="relative italic">
+                <input
+                  required
+                  type="number"
+                  autoFocus
+                  value={depositAmount}
+                  onChange={(e) => setDepositAmount(e.target.value)}
+                  className="w-full px-10 py-8 rounded-[2.5rem] bg-slate-50 border-none focus:ring-4 focus:ring-emerald-500/20 font-black text-4xl tabular-nums transition-all italic text-slate-900"
+                  placeholder="0.00"
+                />
+                <span className="absolute right-10 top-1/2 -translate-y-1/2 text-slate-300 font-black text-xl italic uppercase">PHP</span>
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-4 italic">
+              <button
+                onClick={confirmDeposit}
+                disabled={!depositAmount || parseFloat(depositAmount) <= 0}
+                className={`w-full py-8 rounded-[2.5rem] font-black text-2xl shadow-2xl transition-all active:scale-95 italic ${!depositAmount || parseFloat(depositAmount) <= 0 ? 'bg-slate-100 text-slate-300 cursor-not-allowed' : 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-emerald-200'}`}
+              >
+                Inject Capital
+              </button>
+              <button
+                onClick={() => setIsDepositModalOpen(false)}
+                className="w-full py-5 bg-white text-slate-300 rounded-[2rem] font-black text-sm uppercase tracking-[0.3em] hover:text-slate-900 transition-colors italic"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   const handleRequestUnlock = (slotIndex: number) => {
     setVerifyingSlot(slotIndex);
     setIsConfirmingEdit(true);
@@ -699,23 +808,123 @@ const App: React.FC = () => {
   };
 
   // --- Dashboard Tab ---
-  const renderDashboard = () => (
-    <div className="space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-700 italic">
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 italic">
-        <div><h2 className="text-5xl font-black text-slate-900 tracking-tight italic">Summary</h2><p className="text-slate-500 mt-2 text-lg font-medium italic">Your overall business status.</p></div>
-        <div className="flex gap-4 italic">
-          <button className="px-8 py-4 bg-white border border-slate-200 rounded-2xl font-bold text-slate-700 hover:bg-slate-50 transition-all shadow-sm italic">Save Data</button>
-          <button className="px-8 py-4 bg-emerald-600 text-white rounded-2xl font-black hover:bg-emerald-700 shadow-xl shadow-emerald-200 transition-all italic">Print Summary</button>
+  const renderDashboard = () => {
+    const loanDistributionData = derivedInvestors.map(inv => ({
+      name: inv.name,
+      value: inv.totalInvested
+    }));
+
+    return (
+      <div className="space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-700 italic pb-20">
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 italic">
+          <div>
+            <h2 className="text-5xl font-black text-slate-900 tracking-tight italic">Ecosystem Pulse</h2>
+            <p className="text-slate-500 mt-2 text-lg font-medium italic">Consolidated Capital & Portfolio Overview</p>
+          </div>
+          <div className="flex gap-4 italic shrink-0">
+            <div className="bg-emerald-50 px-6 py-4 rounded-2xl border border-emerald-100 flex flex-col items-center justify-center italic">
+              <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest italic leading-none mb-1">Total Available Cash</p>
+              <p className="text-2xl font-black text-emerald-700 italic tabular-nums">{formatCurrency(liveStats.totalAvailable)}</p>
+            </div>
+          </div>
+        </div>
+
+        {/* High-Level KPIs */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 italic">
+          <StatCard label="Total Capital Managed" value={formatCurrency(liveStats.totalManaged)} icon="🏦" trend="up" subtext="Injected + Gains" />
+          <StatCard label="Active Portfolio" value={formatCurrency(liveStats.totalDeployed)} icon="🏧" subtext="Capital out in loans" />
+          <StatCard label="Total Gain Score" value={formatCurrency(liveStats.totalInterestGained)} icon="📈" trend="up" subtext="Historical Earnings" />
+          <StatCard label="Active Borrowers" value={liveStats.activeATMs.toString()} icon="👤" subtext="Current loan accounts" />
+        </div>
+
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-8 italic">
+          {/* Detailed Distribution */}
+          <div className="xl:col-span-2 bg-white rounded-[3.5rem] border border-slate-100 shadow-sm p-10 flex flex-col gap-10 italic">
+            <div className="flex justify-between items-start italic">
+              <div className="italic">
+                <h3 className="text-2xl font-black text-slate-900 tracking-tight italic">Portfolio Distribution</h3>
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest italic mt-1">Loan deployment across investor pools</p>
+              </div>
+              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 text-xs font-black text-slate-400 uppercase italic">Capital Velocity</div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-center italic">
+              <div className="h-64 italic">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie data={loanDistributionData} cx="50%" cy="50%" innerRadius={70} outerRadius={90} paddingAngle={2} dataKey="value">
+                      {loanDistributionData.map((_, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip contentStyle={{ borderRadius: '20px', border: 'none', boxShadow: '0 20px 40px -10px rgba(0,0,0,0.1)', fontWeight: '900', fontSize: '12px' }} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+
+              <div className="space-y-4 italic">
+                <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest italic border-b border-slate-50 pb-2">Top Allocations</h4>
+                {derivedInvestors.map((inv, idx) => {
+                  const percentOfTotalLoans = liveStats.totalDeployed > 0 ? (inv.totalInvested / liveStats.totalDeployed) * 100 : 0;
+                  return (
+                    <div key={inv.id} className="flex flex-col gap-2 italic">
+                      <div className="flex justify-between items-center italic">
+                        <div className="flex items-center gap-3 italic">
+                          <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: COLORS[idx % COLORS.length] }}></div>
+                          <span className="text-sm font-black text-slate-700 italic">{inv.name}</span>
+                        </div>
+                        <span className="text-xs font-black text-slate-900 italic">{percentOfTotalLoans.toFixed(0)}%</span>
+                      </div>
+                      <div className="h-1.5 w-full bg-slate-50 rounded-full overflow-hidden italic">
+                        <div className="h-full bg-slate-900 rounded-full transition-all duration-1000" style={{ width: `${percentOfTotalLoans}%`, backgroundColor: COLORS[idx % COLORS.length] }}></div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
+          {/* Quick List of Active Loans */}
+          <div className="xl:col-span-1 bg-[#0f172a] text-white rounded-[3.5rem] p-10 shadow-2xl flex flex-col gap-8 italic">
+            <div className="italic">
+              <h3 className="text-xl font-black italic tracking-tight italic">Active Loans</h3>
+              <p className="text-emerald-500 font-bold uppercase tracking-[0.2em] text-[10px] italic mt-1 italic">Real-time status</p>
+            </div>
+
+            <div className="space-y-4 overflow-y-auto max-h-[350px] custom-scrollbar pr-2 italic">
+              {customers.filter(c => !c.isCompleted).length > 0 ? (
+                customers.filter(c => !c.isCompleted).map(c => {
+                  const progress = ((c.totalPayable - c.remainingBalance) / c.totalPayable) * 100;
+                  return (
+                    <div key={c.id} className="bg-white/5 border border-white/10 p-5 rounded-[2rem] hover:bg-white/10 transition-all cursor-pointer italic group" onClick={() => { setSelectedCustomer(c); setCurrentTab('customers'); }}>
+                      <div className="flex justify-between items-start mb-2 italic">
+                        <div>
+                          <p className="font-black text-sm italic">{c.name}</p>
+                          <p className="text-[8px] font-bold text-slate-500 uppercase italic">Pool: {c.moneyOwner}</p>
+                        </div>
+                        <span className="text-[10px] font-black text-emerald-400 italic">{formatCurrency(c.principalAmount)}</span>
+                      </div>
+                      <div className="w-full h-1 bg-white/5 rounded-full overflow-hidden mt-3 italic">
+                        <div className="h-full bg-emerald-500 rounded-full group-hover:bg-emerald-400 transition-all" style={{ width: `${progress}%` }}></div>
+                      </div>
+                    </div>
+                  );
+                })
+              ) : (
+                <div className="flex flex-col items-center justify-center py-10 text-center italic">
+                  <span className="text-4xl mb-4 italic opacity-20">📭</span>
+                  <p className="text-slate-500 font-bold text-xs uppercase tracking-widest italic">Inventory Empty</p>
+                </div>
+              )}
+            </div>
+
+            <button onClick={() => setCurrentTab('customers')} className="w-full py-5 bg-white text-slate-900 rounded-[2rem] font-black text-xs uppercase tracking-[0.2em] hover:bg-emerald-400 transition-all italic mt-auto">Manage All Clients</button>
+          </div>
         </div>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 italic">
-        <StatCard label="Total Money from Investors" value={formatCurrency(liveStats.totalManaged)} icon="🏦" trend="up" subtext="All cash pools" />
-        <StatCard label="Active Customers" value={liveStats.activeATMs} icon="🏧" subtext="People currently borrowing" />
-        <StatCard label="Success Rate" value={`${liveStats.monthlyPerformance}%`} icon="📈" trend="up" subtext="Monthly performance" />
-        <StatCard label="Total Profits Gained" value={formatCurrency(liveStats.totalInterestGained)} icon="💰" subtext="Money made from interest" />
-      </div>
-    </div>
-  );
+    );
+  };
 
   const renderSettlementModal = () => {
     if (!isSettlementModalOpen || !selectedCustomer) return null;
@@ -941,7 +1150,6 @@ const App: React.FC = () => {
   // --- Investors Tab ---
   const renderInvestorsPage = () => {
     const pieData = derivedInvestors.map(inv => ({ name: inv.name, value: inv.initialCapital }));
-    const COLORS = ['#10b981', '#0f172a', '#334155', '#94a3b8'];
 
     return (
       <div className="space-y-12 animate-in fade-in slide-in-from-bottom-6 duration-700 italic">
@@ -993,7 +1201,10 @@ const App: React.FC = () => {
                           <p className="text-emerald-400 font-bold tracking-[0.3em] uppercase text-[10px] italic">Investor Name</p>
                         </div>
                       </div>
-                      <button onClick={() => handleWithdrawFunds(inv)} className="px-6 py-3 bg-white/5 border border-white/10 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-red-500 hover:border-red-500 transition-all italic">Withdraw Available</button>
+                      <div className="flex items-center gap-3 italic">
+                        <button onClick={() => handleDepositFunds(inv)} className="px-6 py-3 bg-white/10 border border-white/20 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-emerald-600 hover:border-emerald-600 transition-all italic shrink-0">Add Funds</button>
+                        <button onClick={() => handleWithdrawFunds(inv)} className="px-6 py-3 bg-white/5 border border-white/10 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-red-500 hover:border-red-500 transition-all italic shrink-0">Withdraw Available</button>
+                      </div>
                     </div>
                     <div className="grid grid-cols-3 gap-6 italic">
                       <div className="bg-white/5 p-6 rounded-[2rem] border border-white/10 group-hover:bg-white/10 transition-colors italic">
@@ -1270,6 +1481,14 @@ const App: React.FC = () => {
                     label: `Capital Withdrawal`,
                     pool: inv.name
                   }))),
+                  ...baseInvestors.flatMap(inv => (inv.deposits || []).map(d => ({
+                    id: d.id,
+                    date: new Date(d.date).getTime(),
+                    type: 'INJECTION',
+                    amount: d.amount,
+                    label: `Capital Top-up`,
+                    pool: inv.name
+                  }))),
                   ...customers.flatMap(c => (c.extensions || []).map(ext => ({
                     id: ext.id,
                     date: new Date(ext.date).getTime(),
@@ -1308,6 +1527,263 @@ const App: React.FC = () => {
       </div>
     </div>
   );
+
+  const renderAnalyticsPage = () => {
+    const totalPrincipal = customers.reduce((acc, c) => acc + c.principalAmount, 0);
+    const totalReturned = customers.reduce((acc, c) => acc + (c.totalPayable - c.remainingBalance), 0);
+    const averageLoan = customers.length > 0 ? totalPrincipal / customers.length : 0;
+
+    const monthlyProfits: { [key: string]: number } = {};
+    derivedInvestors.forEach(inv => {
+      inv.performanceHistory.forEach(h => {
+        monthlyProfits[h.month] = (monthlyProfits[h.month] || 0) + h.profit;
+      });
+    });
+
+    const historicalData = Object.entries(monthlyProfits)
+      .map(([month, profit]) => ({ month, profit }))
+      .sort((a, b) => {
+        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        return months.indexOf(a.month) - months.indexOf(b.month);
+      });
+
+    const investorPerformance = derivedInvestors.map(inv => ({
+      name: inv.name,
+      roi: inv.roi,
+      profit: inv.totalGained
+    }));
+
+    return (
+      <div className="space-y-10 animate-in fade-in slide-in-from-bottom-6 duration-700 italic">
+        <div className="flex justify-between items-end italic">
+          <div>
+            <h2 className="text-5xl font-black text-slate-900 tracking-tight italic">Analytics</h2>
+            <p className="text-slate-500 mt-2 text-lg font-medium italic">See how your money is growing and how well it's working.</p>
+          </div>
+          <div className="flex gap-4 italic shrink-0">
+            <div className="bg-blue-50 px-6 py-4 rounded-2xl border border-blue-100 italic">
+              <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest italic mb-1">Money Health Score</p>
+              <p className="text-2xl font-black text-blue-700 italic">Excellent</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 italic">
+          <div className="lg:col-span-2 bg-white p-10 rounded-[3.5rem] border border-slate-100 shadow-sm italic">
+            <div className="flex justify-between items-center mb-10 italic">
+              <h3 className="text-xl font-black text-slate-900 uppercase tracking-widest italic">Total Savings Growth</h3>
+              <select className="bg-slate-50 border-none rounded-xl text-xs font-bold px-4 py-2 italic text-slate-900">
+                <option>Last 6 Months</option>
+                <option>Last Year</option>
+              </select>
+            </div>
+            <div className="h-80 italic">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={historicalData}>
+                  <defs>
+                    <linearGradient id="colorProfit" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 'bold', fill: '#94a3b8' }} dy={10} />
+                  <Tooltip
+                    contentStyle={{ borderRadius: '20px', border: 'none', boxShadow: '0 20px 40px -10px rgba(0,0,0,0.1)', fontWeight: '900' }}
+                    formatter={(value: number) => [formatCurrency(value), 'Earnings']}
+                  />
+                  <Area type="monotone" dataKey="profit" stroke="#10b981" strokeWidth={4} fillOpacity={1} fill="url(#colorProfit)" />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          <div className="space-y-6 italic">
+            <div className="bg-slate-900 text-white p-8 rounded-[3rem] shadow-xl italic relative overflow-hidden group">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 rounded-full -mr-10 -mt-10 blur-2xl group-hover:bg-emerald-500/20 transition-all"></div>
+              <p className="text-[10px] font-black text-emerald-400 uppercase tracking-widest mb-2 italic">Average Money Lent</p>
+              <h4 className="text-3xl font-black italic tracking-tight">{formatCurrency(averageLoan)}</h4>
+              <p className="text-slate-400 text-[10px] mt-4 font-bold italic">From {customers.length} people</p>
+            </div>
+
+            <div className="bg-white p-8 rounded-[3rem] border border-slate-100 shadow-sm italic">
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 italic">Money Coming Back</p>
+              <div className="flex justify-between items-end mb-4 italic">
+                <h4 className="text-3xl font-black text-slate-900 italic tracking-tight">{Math.round((totalReturned / totalPrincipal) * 100) || 0}%</h4>
+                <p className="text-emerald-600 font-black text-xs italic">Doing Great!</p>
+              </div>
+              <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden italic">
+                <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${Math.round((totalReturned / totalPrincipal) * 100) || 0}%` }}></div>
+              </div>
+            </div>
+
+            <div className="bg-emerald-600 text-white p-8 rounded-[3rem] shadow-xl italic">
+              <p className="text-[10px] font-black text-emerald-100 uppercase tracking-widest mb-2 italic">Overall Grade</p>
+              <div className="flex items-center gap-4 italic">
+                <span className="text-4xl italic">⭐</span>
+                <div className="italic">
+                  <h4 className="text-3xl font-black italic tracking-tight">Excellent</h4>
+                  <p className="text-emerald-100/60 text-[10px] font-bold italic">Top notch performance</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 italic">
+          {/* Investor Distribution Pie */}
+          <div className="bg-white p-10 rounded-[3.5rem] border border-slate-100 shadow-sm italic flex flex-col">
+            <h3 className="text-xl font-black text-slate-900 mb-8 uppercase tracking-widest italic">Who Gave the Money?</h3>
+            <div className="h-64 italic relative">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={derivedInvestors.map(inv => ({ name: inv.name, value: inv.initialCapital }))}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={60}
+                    outerRadius={80}
+                    paddingAngle={5}
+                    dataKey="value"
+                  >
+                    {derivedInvestors.map((_, index) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    contentStyle={{ borderRadius: '20px', border: 'none', boxShadow: '0 20px 40px -10px rgba(0,0,0,0.1)', fontWeight: '900' }}
+                    formatter={(value: number) => formatCurrency(value)}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest italic">Capital</p>
+              </div>
+            </div>
+            <div className="mt-6 grid grid-cols-2 gap-4 italic text-center">
+              {derivedInvestors.map((inv, idx) => (
+                <div key={inv.id} className="p-4 bg-slate-50 rounded-2xl border border-slate-100 italic">
+                  <p className="text-[10px] font-black uppercase tracking-widest mb-1 italic" style={{ color: COLORS[idx % COLORS.length] }}>{inv.name}</p>
+                  <p className="font-black text-slate-900">{((inv.initialCapital / liveStats.totalManaged) * 100).toFixed(1)}%</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Available vs Invested Pie */}
+          <div className="bg-white p-10 rounded-[3.5rem] border border-slate-100 shadow-sm italic flex flex-col">
+            <h3 className="text-xl font-black text-slate-900 mb-8 uppercase tracking-widest italic">How Money is Used</h3>
+            <div className="h-64 italic relative">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={[
+                      { name: 'Available Cash', value: liveStats.totalAvailable },
+                      { name: 'Invested Capital', value: liveStats.totalDeployed }
+                    ]}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={60}
+                    outerRadius={80}
+                    paddingAngle={2}
+                    dataKey="value"
+                  >
+                    <Cell fill="#10b981" /> {/* Available */}
+                    <Cell fill="#3b82f6" /> {/* Invested */}
+                  </Pie>
+                  <Tooltip
+                    contentStyle={{ borderRadius: '20px', border: 'none', boxShadow: '0 20px 40px -10px rgba(0,0,0,0.1)', fontWeight: '900' }}
+                    formatter={(value: number) => formatCurrency(value)}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest italic">Status</p>
+              </div>
+            </div>
+            <div className="mt-6 grid grid-cols-2 gap-4 italic">
+              <div className="p-4 bg-emerald-50 rounded-2xl border border-emerald-100 italic flex justify-between items-center">
+                <div className="italic">
+                  <p className="text-[8px] font-black text-emerald-600 uppercase tracking-widest italic">Ready to Use</p>
+                  <p className="font-black text-emerald-700 italic">{((liveStats.totalAvailable / liveStats.totalManaged) * 100).toFixed(1)}%</p>
+                </div>
+                <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
+              </div>
+              <div className="p-4 bg-blue-50 rounded-2xl border border-blue-100 italic flex justify-between items-center">
+                <div className="italic">
+                  <p className="text-[8px] font-black text-blue-600 uppercase tracking-widest italic">Working Loans</p>
+                  <p className="font-black text-blue-700 italic">{((liveStats.totalDeployed / liveStats.totalManaged) * 100).toFixed(1)}%</p>
+                </div>
+                <div className="w-2 h-2 rounded-full bg-blue-500"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 italic">
+          <div className="bg-white p-10 rounded-[3.5rem] border border-slate-100 shadow-sm italic">
+            <h3 className="text-xl font-black text-slate-900 mb-8 uppercase tracking-widest italic">Who Made the Most Growth?</h3>
+            <div className="space-y-6 italic">
+              {investorPerformance.map((inv, idx) => (
+                <div key={inv.name} className="space-y-2 italic">
+                  <div className="flex justify-between items-center italic">
+                    <span className="font-black text-slate-700 italic">{inv.name}</span>
+                    <span className="text-emerald-600 font-black italic">{inv.roi}% Growth</span>
+                  </div>
+                  <div className="h-4 bg-slate-50 rounded-full overflow-hidden italic border border-slate-100">
+                    <div
+                      className="h-full transition-all duration-1000"
+                      style={{
+                        width: `${(inv.roi / Math.max(...investorPerformance.map(i => i.roi), 1)) * 100}%`,
+                        backgroundColor: COLORS[idx % COLORS.length]
+                      }}
+                    ></div>
+                  </div>
+                  <p className="text-[8px] font-bold text-slate-400 uppercase italic">Total Extra Money: {formatCurrency(inv.profit)}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="bg-[#0f172a] text-white p-10 rounded-[3.5rem] shadow-2xl italic relative overflow-hidden">
+            <div className="absolute bottom-0 right-0 w-64 h-64 bg-blue-500/5 rounded-full blur-[100px] pointer-events-none"></div>
+            <h3 className="text-xl font-black italic tracking-tight mb-8 italic">Smart Money Logic</h3>
+            <div className="grid grid-cols-2 gap-6 italic">
+              <div className="p-6 bg-white/5 rounded-[2rem] border border-white/10 italic">
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 italic">Money at Risk</p>
+                <div className="flex items-center gap-2 italic">
+                  <span className="text-2xl font-black italic text-emerald-400">NONE</span>
+                  <span className="text-[8px] font-bold text-slate-500 italic">SAFE</span>
+                </div>
+              </div>
+              <div className="p-6 bg-white/5 rounded-[2rem] border border-white/10 italic">
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 italic">Cash Speed</p>
+                <div className="flex items-center gap-2 italic">
+                  <span className="text-2xl font-black italic text-blue-400">FAST</span>
+                  <span className="text-[8px] font-bold text-slate-500 italic">GOOD</span>
+                </div>
+              </div>
+              <div className="p-6 bg-white/5 rounded-[2rem] border border-white/10 italic">
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 italic">Re-investment Potential</p>
+                <div className="flex items-center gap-2 italic">
+                  <span className="text-2xl font-black italic text-amber-400">HIGH</span>
+                </div>
+              </div>
+              <div className="p-6 bg-white/5 rounded-[2rem] border border-white/10 italic">
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 italic">Room to Expand</p>
+                <div className="flex items-center gap-2 italic">
+                  <span className="text-2xl font-black italic text-rose-400">LOTS</span>
+                </div>
+              </div>
+            </div>
+            <div className="mt-8 bg-emerald-500/10 border border-emerald-500/20 p-6 rounded-[2rem] italic">
+              <p className="text-xs font-black text-emerald-400 italic mb-2 ✨ SMART TIP">Ready to Send Out More Money!</p>
+              <p className="text-[10px] text-slate-400 leading-relaxed italic">The money is coming back fast! We can send out 25% more money to customers safely.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   // --- Customer Details Tab ---
   const renderCustomerDetails = (customer: Customer) => {
@@ -1455,6 +1931,7 @@ const App: React.FC = () => {
             )}
             {currentTab === 'investors' && renderInvestorsPage()}
             {currentTab === 'transactions' && renderTransactionsPage()}
+            {currentTab === 'analytics' && renderAnalyticsPage()}
           </div>
         )}
         {renderNewInvestorModal()}
@@ -1530,6 +2007,8 @@ const App: React.FC = () => {
 
         {/* Modals & Helpers */}
         {renderNewInvestorModal()}
+        {renderWithdrawModal()}
+        {renderDepositModal()}
         {renderEditConfirmationNotifier()}
       </main>
     </div>

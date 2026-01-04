@@ -58,6 +58,7 @@ export interface Investor {
   roi: number;
   performanceHistory: { month: string; profit: number }[];
   withdrawals: { id: string; date: string; amount: number }[]; // New: Track capital outflows
+  deposits?: { id: string; date: string; amount: number }[]; // New: Track capital inflows
   isWithdrawn?: boolean; // New: Flag for investors who pulled out
 }
 
