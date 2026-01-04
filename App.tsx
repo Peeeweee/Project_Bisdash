@@ -6,6 +6,8 @@ import StatCard from './components/UI/StatCard';
 import { mockCustomers as initialCustomers, mockInvestors as initialInvestors, businessStats } from './services/mockData';
 import { Customer, PaymentStatus, Investor, PaymentEntry } from './types';
 import { Tooltip, ResponsiveContainer, AreaChart, Area, Cell, PieChart, Pie, LineChart, Line, XAxis } from 'recharts';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 // --- Utility: Calculate Strict 15th/30th Deadlines (Starts NEXT MONTH) ---
 const getPaymentDeadlines = (startDate: string, numCycles: number): string[] => {
@@ -120,6 +122,248 @@ const App: React.FC = () => {
     ...c,
     payments: c.payments.map(p => ({ ...p, isLocked: true }))
   })));
+
+  // --- PDF Generation Logic ---
+  const generateCustomerPDF = (customer: Customer) => {
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.getWidth();
+
+    // Summary Statistics
+    const totalShorts = customer.payments.filter(p => p.status === PaymentStatus.SHORT).length;
+    const totalLates = customer.payments.filter(p => p.status === PaymentStatus.LATE).length;
+    const totalOverdue = customer.payments.filter(p => p.status === PaymentStatus.OVERDUE).length;
+    const totalPayments = customer.payments.length;
+
+    // Header
+    doc.setFillColor(16, 185, 129); // Emerald 500
+    doc.rect(0, 0, pageWidth, 40, 'F');
+
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(24);
+    doc.setFont("helvetica", "bold");
+    doc.text("BISDASH", 20, 25);
+
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    doc.text("ATM MANAGEMENT SYSTEM", 20, 32);
+
+    doc.setFontSize(14);
+    doc.text(`CUSTOMER REPORT: ${customer.name.toUpperCase()}`, pageWidth - 20, 25, { align: 'right' });
+    doc.setFontSize(10);
+    doc.text(`Date Printed: ${new Date().toLocaleDateString()}`, pageWidth - 20, 32, { align: 'right' });
+
+    // Payment Behavior Summary
+    doc.setTextColor(15, 23, 42);
+    doc.setFontSize(12);
+    doc.setFont("helvetica", "bold");
+    doc.text("Payment Behavior Summary", 20, 55);
+
+    autoTable(doc, {
+      startY: 60,
+      head: [['Total Payments', 'Short Payments', 'Late Payments', 'Overdue Cycles']],
+      body: [[
+        String(totalPayments),
+        { content: String(totalShorts), styles: { textColor: totalShorts > 0 ? [239, 68, 68] : [15, 23, 42], fontStyle: 'bold' } },
+        { content: String(totalLates), styles: { textColor: totalLates > 0 ? [245, 158, 11] : [15, 23, 42], fontStyle: 'bold' } },
+        { content: String(totalOverdue), styles: { textColor: totalOverdue > 0 ? [220, 38, 38] : [15, 23, 42], fontStyle: 'bold' } }
+      ]],
+      theme: 'grid',
+      headStyles: { fillColor: [248, 250, 252], textColor: [100, 116, 139], fontSize: 8 },
+      styles: { halign: 'center', fontSize: 10 }
+    });
+
+    // Loan Overview
+    doc.setFontSize(12);
+    doc.setFont("helvetica", "bold");
+    doc.text("Loan Overview", 20, (doc as any).lastAutoTable.finalY + 15);
+
+    autoTable(doc, {
+      startY: (doc as any).lastAutoTable.finalY + 20,
+      head: [['Metric', 'Value']],
+      body: [
+        ['Customer Name', customer.name],
+        ['Money Source', customer.moneyOwner],
+        ['Principal Amount', formatPDFCurrency(customer.principalAmount)],
+        ['Monthly Interest', `${(customer.interestRate * 100).toFixed(0)}%`],
+        ['Total Payable', formatPDFCurrency(customer.totalPayable)],
+        ['Remaining Balance', formatPDFCurrency(customer.remainingBalance)],
+        ['Loan Status', customer.isCompleted ? 'FULLY SETTLED' : 'ACTIVE'],
+        ['Start Date', formatDate(customer.startDate)],
+      ],
+      theme: 'striped',
+      headStyles: { fillColor: [15, 23, 42], textColor: [255, 255, 255] },
+      styles: { fontSize: 9, cellPadding: 3 },
+    });
+
+    // Payment History
+    doc.setFontSize(12);
+    doc.setFont("helvetica", "bold");
+    doc.text("Detailed Transaction Ledger", 20, (doc as any).lastAutoTable.finalY + 15);
+
+    const paymentRows = customer.payments.map((p, idx) => {
+      const extraPaymentsInfo = p.additionalPayments.length > 0
+        ? `(+${p.additionalPayments.length} Follow-ups)`
+        : '';
+
+      let statusText: string = p.status;
+      if (p.status === PaymentStatus.SHORT && p.shortAmount > 0) {
+        statusText = `SHORT (Owed: ${formatPDFCurrency(p.shortAmount)})`;
+      }
+
+      return [
+        `Cycle ${idx + 1}`,
+        formatDate(p.date),
+        formatPDFCurrency(p.expectedAmount),
+        formatPDFCurrency(p.actualAmount),
+        `${statusText} ${extraPaymentsInfo}`,
+        p.location || 'N/A',
+        p.proofImage || p.proofImages?.[0] ? 'YES' : 'NO'
+      ];
+    });
+
+    autoTable(doc, {
+      startY: (doc as any).lastAutoTable.finalY + 20,
+      head: [['Cycle', 'Date', 'Expected', 'Paid', 'Status', 'Location', 'Proof']],
+      body: paymentRows,
+      theme: 'grid',
+      headStyles: { fillColor: [16, 185, 129] },
+      styles: { fontSize: 7, halign: 'center' },
+      columnStyles: { 4: { halign: 'left', cellWidth: 45 }, 5: { halign: 'left' } },
+      didParseCell: (data) => {
+        if (data.section === 'body' && data.column.index === 4) {
+          const val = String(data.cell.raw);
+          if (val.includes('SHORT') || val.includes('OVERDUE') || val.includes('LATE')) {
+            data.cell.styles.fontStyle = 'bold';
+            if (val.includes('SHORT') || val.includes('OVERDUE')) {
+              data.cell.styles.textColor = [220, 38, 38]; // Red
+            } else if (val.includes('LATE')) {
+              data.cell.styles.textColor = [217, 119, 6]; // Amber
+            }
+          }
+        }
+      }
+    });
+
+    // Verification Footer
+    const finalY = (doc as any).lastAutoTable.finalY + 10;
+    if (finalY < 270) {
+      doc.setFontSize(8);
+      doc.setTextColor(148, 163, 184);
+      doc.text("This is a system-generated statement. Proofs and verification logs are stored securely in the Bisdash Blockchain.", pageWidth / 2, finalY, { align: 'center' });
+    }
+
+    doc.save(`Bisdash_Statement_${customer.name.replace(/\s+/g, '_')}.pdf`);
+  };
+
+  const generateInvestorPDF = (investor: Investor) => {
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.getWidth();
+
+    // Header (Indigo Theme for Investors)
+    doc.setFillColor(79, 70, 229); // Indigo 600
+    doc.rect(0, 0, pageWidth, 40, 'F');
+
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(24);
+    doc.setFont("helvetica", "bold");
+    doc.text("BISDASH", 20, 25);
+
+    doc.setFontSize(14);
+    doc.text(`INVESTOR PORTFOLIO: ${investor.name.toUpperCase()}`, pageWidth - 20, 25, { align: 'right' });
+    doc.setFontSize(10);
+    doc.text(`Report Date: ${new Date().toLocaleDateString()}`, pageWidth - 20, 32, { align: 'right' });
+
+    // Financial Performance
+    doc.setTextColor(15, 23, 42);
+    doc.setFontSize(12);
+    doc.setFont("helvetica", "bold");
+    doc.text("Financial Summary", 20, 55);
+
+    autoTable(doc, {
+      startY: 60,
+      body: [
+        ['Total Pool Capital', formatPDFCurrency(investor.initialCapital)],
+        ['Currently Invested', formatPDFCurrency(investor.totalInvested)],
+        ['Total Earnings (Gained)', formatPDFCurrency(investor.totalGained)],
+        ['Available (Idle) Cash', formatPDFCurrency(investor.availableCapital)],
+        ['Total ROI', `${investor.roi}%`],
+        ['Active Loan Batches', String(investor.activeBatches)],
+      ],
+      theme: 'plain',
+      styles: { fontSize: 10, cellPadding: 4, fontStyle: 'bold' },
+      columnStyles: { 0: { cellWidth: 80 } }
+    });
+
+    // Ledger (Money Flow)
+    doc.text("Recent Transactions & Capital Movements", 20, (doc as any).lastAutoTable.finalY + 15);
+
+    const movements = [
+      ...investor.withdrawals.map(w => ({ date: w.date, label: 'Capital Withdrawal', amount: -w.amount, type: 'OUT' })),
+      ...(investor.deposits || []).map(d => ({ date: d.date, label: 'Capital Top-up', amount: d.amount, type: 'IN' })),
+    ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+    autoTable(doc, {
+      startY: (doc as any).lastAutoTable.finalY + 20,
+      head: [['Date', 'Transaction Type', 'Amount']],
+      body: movements.map(m => [formatDate(m.date), m.label, formatPDFCurrency(m.amount)]),
+      theme: 'striped',
+      headStyles: { fillColor: [79, 70, 229] }
+    });
+
+    doc.save(`Bisdash_Investor_${investor.name.replace(/\s+/g, '_')}.pdf`);
+  };
+
+  const generateFullAdminPDF = () => {
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.getWidth();
+
+    doc.setFillColor(15, 23, 42); // Slate 900
+    doc.rect(0, 0, pageWidth, 40, 'F');
+
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(24);
+    doc.setFont("helvetica", "bold");
+    doc.text("BISDASH", 20, 25);
+    doc.setFontSize(14);
+    doc.text("SYSTEM-WIDE AUDIT REPORT", pageWidth - 20, 25, { align: 'right' });
+
+    doc.setTextColor(15, 23, 42);
+    doc.setFontSize(12);
+    doc.text("Global Ecosystem Stats", 20, 55);
+
+    autoTable(doc, {
+      startY: 60,
+      head: [['Metric', 'Global Value']],
+      body: [
+        ['Total Capital Managed', formatPDFCurrency(liveStats.totalManaged)],
+        ['Total Active Portfolio', formatPDFCurrency(liveStats.totalDeployed)],
+        ['Aggregate Interest Gained', formatPDFCurrency(liveStats.totalInterestGained)],
+        ['Available System Liquidity', formatPDFCurrency(liveStats.totalAvailable)],
+        ['Active ATM Borrowers', String(liveStats.activeATMs)],
+      ],
+      theme: 'grid',
+      headStyles: { fillColor: [15, 23, 42] }
+    });
+
+    doc.text("Full Ledger Record (Last 100 Transactions)", 20, (doc as any).lastAutoTable.finalY + 15);
+
+    autoTable(doc, {
+      startY: (doc as any).lastAutoTable.finalY + 20,
+      head: [['Date', 'Customer/Label', 'Pool', 'Amount', 'Type']],
+      body: allTransactions.slice(0, 100).map(t => [
+        formatDate(t.date),
+        t.customerName || t.label || 'N/A',
+        t.investorPool || t.pool || 'N/A',
+        formatPDFCurrency(t.actualAmount || t.amount || 0),
+        t.status || t.type
+      ]),
+      theme: 'striped',
+      headStyles: { fillColor: [15, 23, 42] },
+      styles: { fontSize: 7 }
+    });
+
+    doc.save("Bisdash_Master_Ledger.pdf");
+  };
 
   const derivedInvestors = useMemo(() => {
     return baseInvestors.map(investor => {
@@ -734,6 +978,10 @@ const App: React.FC = () => {
     return new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(val);
   };
 
+  const formatPDFCurrency = (val: number) => {
+    return "P " + new Intl.NumberFormat('en-PH', { minimumFractionDigits: 2 }).format(val);
+  };
+
   /**
    * Fix: Added missing handleCreateInvestor submit handler.
    */
@@ -1202,6 +1450,9 @@ const App: React.FC = () => {
                         </div>
                       </div>
                       <div className="flex items-center gap-3 italic">
+                        <button onClick={() => generateInvestorPDF(inv)} className="px-6 py-3 bg-white/10 border border-white/20 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-white hover:text-slate-900 transition-all italic shrink-0 flex items-center gap-2 italic">
+                          <span>📥</span> Export PDF
+                        </button>
                         <button onClick={() => handleDepositFunds(inv)} className="px-6 py-3 bg-white/10 border border-white/20 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-emerald-600 hover:border-emerald-600 transition-all italic shrink-0">Add Funds</button>
                         <button onClick={() => handleWithdrawFunds(inv)} className="px-6 py-3 bg-white/5 border border-white/10 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-red-500 hover:border-red-500 transition-all italic shrink-0">Withdraw Available</button>
                       </div>
@@ -1560,7 +1811,13 @@ const App: React.FC = () => {
             <h2 className="text-5xl font-black text-slate-900 tracking-tight italic">Analytics</h2>
             <p className="text-slate-500 mt-2 text-lg font-medium italic">See how your money is growing and how well it's working.</p>
           </div>
-          <div className="flex gap-4 italic shrink-0">
+          <div className="flex gap-4 items-center italic shrink-0">
+            <button
+              onClick={generateFullAdminPDF}
+              className="px-6 py-4 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-slate-800 transition-all shadow-lg flex items-center gap-3 italic"
+            >
+              <span>📊</span> System Audit Report (PDF)
+            </button>
             <div className="bg-blue-50 px-6 py-4 rounded-2xl border border-blue-100 italic">
               <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest italic mb-1">Money Health Score</p>
               <p className="text-2xl font-black text-blue-700 italic">Excellent</p>
@@ -1812,34 +2069,45 @@ const App: React.FC = () => {
               </div>
             </div>
           </div>
-          {!customer.isCompleted && (
-            <div className="flex flex-col items-end gap-3">
-              <button onClick={handleExtendLoan} className="px-8 py-4 bg-white border border-slate-200 rounded-2xl font-black text-slate-700 hover:bg-amber-50 hover:border-amber-200 transition-all shadow-sm italic flex items-center gap-3 italic">
-                <span className="text-lg italic">🕒</span> Extend Loan
+          <div className="flex flex-col items-end gap-3 italic">
+            <div className="flex gap-3 italic">
+              <button
+                onClick={() => generateCustomerPDF(customer)}
+                className="px-8 py-4 bg-emerald-600 text-white rounded-2xl font-black hover:bg-emerald-700 transition-all shadow-lg flex items-center gap-3 italic"
+              >
+                <span>📄</span> Download Statement (PDF)
               </button>
+              {!customer.isCompleted && (
+                <button onClick={handleExtendLoan} className="px-8 py-4 bg-white border border-slate-200 rounded-2xl font-black text-slate-700 hover:bg-amber-50 hover:border-amber-200 transition-all shadow-sm italic flex items-center gap-3 italic">
+                  <span className="text-lg italic">🕒</span> Extend Loan
+                </button>
+              )}
+            </div>
 
-              {/* Extensions List */}
-              {customer.extensions && customer.extensions.length > 0 && (
-                <div className="bg-white p-4 rounded-3xl border border-blue-100 shadow-lg shadow-blue-50/50 flex flex-col gap-2 w-64 animate-in fade-in slide-in-from-top-2">
-                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest pl-2">Active Extensions</p>
-                  {customer.extensions.map(ext => (
-                    <div key={ext.id} className="flex justify-between items-center bg-blue-50/50 p-2 rounded-2xl border border-blue-100 group">
-                      <div className="pl-2">
-                        <p className="text-[10px] font-black text-slate-700">+{ext.addedMonths} Month{ext.addedMonths > 1 ? 's' : ''}</p>
-                        <p className="text-[8px] font-bold text-slate-400 uppercase">{formatDate(ext.date)}</p>
-                      </div>
+            {/* Extensions List */}
+            {customer.extensions && customer.extensions.length > 0 && (
+              <div className="bg-white p-4 rounded-3xl border border-blue-100 shadow-lg shadow-blue-50/50 flex flex-col gap-2 w-64 animate-in fade-in slide-in-from-top-2">
+                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest pl-2">Active Extensions</p>
+                {customer.extensions.map(ext => (
+                  <div key={ext.id} className="flex justify-between items-center bg-blue-50/50 p-2 rounded-2xl border border-blue-100 group">
+                    <div className="pl-2">
+                      <p className="text-[10px] font-black text-slate-700">+{ext.addedMonths} Month{ext.addedMonths > 1 ? 's' : ''}</p>
+                      <p className="text-[8px] font-bold text-slate-400 uppercase">{formatDate(ext.date)}</p>
+                    </div>
+                    {!customer.isCompleted && (
                       <button
                         onClick={() => handleCancelExtension(ext.id)}
                         className="bg-white text-rose-500 hover:bg-rose-50 border border-slate-100 px-3 py-1.5 rounded-xl text-[8px] font-black uppercase tracking-widest hover:border-rose-200 transition-colors shadow-sm">
                         Cancel
                       </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
+
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 italic">
           <div className="lg:col-span-3 space-y-10 italic">
             <div className="space-y-6 italic">
@@ -1869,7 +2137,7 @@ const App: React.FC = () => {
             </div>
           </div>
           <div className="space-y-8 italic">
-            <div className="bg-[#0f172a] text-white p-10 rounded-[3rem] shadow-2xl relative overflow-hidden text-center flex flex-col justify-between italic h-full">
+            <div className="bg-[#0f172a] text-white p-10 rounded-[3rem] shadow-2xl relative overflow-hidden text-center flex flex-col justify-between italic h-[400px]">
               <h3 className="text-2xl font-black tracking-tight italic uppercase tracking-[0.2em] pt-4 italic">Repayment Pulse</h3>
               <div className="relative w-48 h-48 mx-auto flex items-center justify-center italic">
                 <svg viewBox="0 0 160 160" className="w-full h-full transform -rotate-90 italic">
@@ -1881,7 +2149,7 @@ const App: React.FC = () => {
               <div className="pb-4 space-y-4 italic">
                 <div className="text-center italic"><p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1 italic">Left to Collect</p><p className="text-2xl font-black italic">{formatCurrency(customer.remainingBalance)}</p></div>
                 {!customer.isCompleted ? (
-                  <button onClick={handleFullSettle} className="w-full py-5 bg-emerald-600 rounded-[2rem] font-black text-lg hover:bg-emerald-700 shadow-[0_12px_40px_-10px_rgba(16,185,129,0.5)] transition-all italic">Mark Fully Paid</button>
+                  <button onClick={handleFullSettle} className="w-full py-5 bg-emerald-600 rounded-[2rem] font-black text-lg hover:bg-emerald-700 shadow-[0_12px_40_rgba(16,185,129,0.5)] transition-all italic">Mark Fully Paid</button>
                 ) : (
                   <div className="w-full py-5 bg-emerald-500/10 border border-emerald-500/30 rounded-[2rem] text-emerald-400 font-black text-lg italic uppercase tracking-widest flex items-center justify-center gap-2 italic animate-in zoom-in-95"><span>✅</span> Loan Completed</div>
                 )}
@@ -1889,7 +2157,7 @@ const App: React.FC = () => {
             </div>
           </div>
         </div>
-      </div >
+      </div>
     );
   };
 
