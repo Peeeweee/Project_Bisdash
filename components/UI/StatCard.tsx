@@ -17,16 +17,15 @@ const StatCard: React.FC<StatCardProps> = ({ label, value, subtext, icon, trend 
           {icon}
         </div>
         {trend && (
-          <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase ${
-            trend === 'up' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'
-          }`}>
+          <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase ${trend === 'up' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'
+            }`}>
             {trend === 'up' ? '↑ High' : '↓ Low'}
           </span>
         )}
       </div>
-      <h3 className="text-slate-400 text-sm font-bold uppercase tracking-wider">{label}</h3>
-      <p className="text-3xl font-black text-slate-900 mt-1">{value}</p>
-      {subtext && <p className="text-xs text-slate-400 mt-2 font-medium">{subtext}</p>}
+      <h3 className="text-slate-400 text-xs md:text-sm font-black italic uppercase tracking-wider">{label}</h3>
+      <p className="text-2xl md:text-3xl font-black text-slate-900 mt-1 italic tabular-nums">{value}</p>
+      {subtext && <p className="text-[10px] md:text-xs text-slate-400 mt-2 font-black italic uppercase tracking-wider">{subtext}</p>}
     </div>
   );
 };

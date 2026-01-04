@@ -75,16 +75,16 @@ const LandingPage = ({ onContinue }: { onContinue: () => void }) => (
           <BisdashLogo className="w-24 h-24" />
         </div>
         <div className="space-y-2">
-          <h1 className="text-7xl font-black text-slate-900 tracking-tighter uppercase italic">Bisdash</h1>
-          <p className="text-emerald-600 font-black tracking-[0.4em] text-xs uppercase italic">Simple ATM Tracking</p>
+          <h1 className="text-5xl md:text-7xl font-black text-slate-900 tracking-tighter uppercase italic">Bisdash</h1>
+          <p className="text-emerald-600 font-black tracking-[0.4em] text-[10px] md:text-xs uppercase italic">Simple ATM Tracking</p>
         </div>
       </div>
       <div className="space-y-6">
-        <h2 className="text-5xl md:text-6xl font-black text-slate-900 leading-[1.1] tracking-tight italic">Watch your business <br /><span className="text-emerald-600">grow clearly.</span></h2>
-        <p className="text-xl text-slate-500 max-w-2xl mx-auto font-medium leading-relaxed italic">No complicated bank words. Just your money and your customers, clearly tracked.</p>
+        <h2 className="text-4xl md:text-6xl font-black text-slate-900 leading-[1.1] tracking-tight italic">Watch your business <br /><span className="text-emerald-600">grow clearly.</span></h2>
+        <p className="text-lg md:text-xl text-slate-500 max-w-2xl mx-auto font-medium leading-relaxed italic">No complicated bank words. Just your money and your customers, clearly tracked.</p>
       </div>
       <div className="pt-6">
-        <button onClick={onContinue} className="group relative px-12 py-6 bg-slate-900 text-white rounded-[2.5rem] font-black text-xl hover:bg-emerald-600 transition-all duration-500 shadow-2xl shadow-slate-300 hover:shadow-emerald-200 flex items-center gap-4 mx-auto italic">
+        <button onClick={onContinue} className="group relative px-8 md:px-12 py-5 md:py-6 bg-slate-900 text-white rounded-[2.5rem] font-black text-lg md:text-xl hover:bg-emerald-600 transition-all duration-500 shadow-2xl shadow-slate-300 hover:shadow-emerald-200 flex items-center gap-4 mx-auto italic">
           <span>Open Dashboard</span><span className="text-2xl group-hover:translate-x-2 transition-transform italic">→</span>
         </button>
       </div>
@@ -1063,14 +1063,14 @@ const App: React.FC = () => {
     }));
 
     return (
-      <div className="space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-700 italic pb-20">
+      <div className="space-y-8 md:space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-700 italic pb-20">
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 italic">
-          <div>
-            <h2 className="text-5xl font-black text-slate-900 tracking-tight italic">Ecosystem Pulse</h2>
-            <p className="text-slate-500 mt-2 text-lg font-medium italic">Consolidated Capital & Portfolio Overview</p>
+          <div className="text-center md:text-left">
+            <h2 className="text-4xl md:text-5xl font-black text-slate-900 tracking-tight italic">Ecosystem Pulse</h2>
+            <p className="text-slate-500 mt-2 text-base md:text-lg font-medium italic">Consolidated Capital & Portfolio Overview</p>
           </div>
-          <div className="flex gap-4 italic shrink-0">
-            <div className="bg-emerald-50 px-6 py-4 rounded-2xl border border-emerald-100 flex flex-col items-center justify-center italic">
+          <div className="flex flex-col items-center md:items-end gap-4 italic shrink-0">
+            <div className="bg-emerald-50 px-6 py-4 rounded-2xl border border-emerald-100 flex flex-col items-center justify-center italic w-full md:w-auto">
               <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest italic leading-none mb-1">Total Available Cash</p>
               <p className="text-2xl font-black text-emerald-700 italic tabular-nums">{formatCurrency(liveStats.totalAvailable)}</p>
             </div>
@@ -1401,12 +1401,12 @@ const App: React.FC = () => {
 
     return (
       <div className="space-y-12 animate-in fade-in slide-in-from-bottom-6 duration-700 italic">
-        <div className="flex justify-between items-center italic">
-          <div className="italic">
-            <h2 className="text-5xl font-black text-slate-900 tracking-tight italic">Investors</h2>
-            <p className="text-slate-500 mt-2 text-lg font-medium italic text-emerald-600 animate-pulse font-bold uppercase tracking-widest text-[10px] italic">Track who provided the cash</p>
+        <div className="flex flex-col md:flex-row justify-between items-center gap-6 italic">
+          <div className="italic text-center md:text-left">
+            <h2 className="text-4xl md:text-5xl font-black text-slate-900 tracking-tight italic">Investors</h2>
+            <p className="text-slate-500 mt-2 text-base md:text-lg font-medium italic text-emerald-600 animate-pulse font-bold uppercase tracking-widest text-[10px] italic">Track who provided the cash</p>
           </div>
-          <button onClick={() => setIsAddingInvestor(true)} className="bg-emerald-600 text-white px-10 py-5 rounded-[2rem] font-black text-lg hover:bg-emerald-700 shadow-2xl transition-all italic">+ Add Investor Pool</button>
+          <button onClick={() => setIsAddingInvestor(true)} className="w-full md:w-auto bg-emerald-600 text-white px-10 py-5 rounded-[2rem] font-black text-lg hover:bg-emerald-700 shadow-2xl transition-all italic">+ Add Investor Pool</button>
         </div>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 italic">
           <div className="bg-white p-10 rounded-[3rem] border border-slate-100 shadow-sm col-span-1 italic self-start sticky top-12">
@@ -1441,23 +1441,23 @@ const App: React.FC = () => {
                 <div key={inv.id} className="bg-[#0f172a] text-white p-10 rounded-[3.5rem] shadow-2xl relative overflow-hidden flex flex-col gap-10 group hover:scale-[1.01] transition-all duration-500 italic border border-white/5">
                   <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/5 rounded-full blur-[100px] pointer-events-none italic"></div>
                   <div className="flex-1 space-y-8 italic">
-                    <div className="flex items-center justify-between italic">
-                      <div className="flex items-center gap-5 italic">
-                        <div className="w-20 h-20 bg-emerald-500/10 rounded-3xl flex items-center justify-center text-4xl italic border border-emerald-500/20 shadow-lg shadow-emerald-500/5">👤</div>
+                    <div className="flex flex-col md:flex-row items-center md:justify-between gap-6 italic">
+                      <div className="flex flex-col md:flex-row items-center gap-5 italic text-center md:text-left">
+                        <div className="w-16 h-16 md:w-20 md:h-20 bg-emerald-500/10 rounded-3xl flex items-center justify-center text-3xl md:text-4xl italic border border-emerald-500/20 shadow-lg shadow-emerald-500/5">👤</div>
                         <div className="italic">
-                          <h4 className="text-4xl font-black italic tracking-tight">{inv.name}</h4>
+                          <h4 className="text-3xl md:text-4xl font-black italic tracking-tight">{inv.name}</h4>
                           <p className="text-emerald-400 font-bold tracking-[0.3em] uppercase text-[10px] italic">Investor Name</p>
                         </div>
                       </div>
-                      <div className="flex items-center gap-3 italic">
-                        <button onClick={() => generateInvestorPDF(inv)} className="px-6 py-3 bg-white/10 border border-white/20 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-white hover:text-slate-900 transition-all italic shrink-0 flex items-center gap-2 italic">
-                          <span>📥</span> Export PDF
+                      <div className="flex flex-wrap justify-center items-center gap-3 italic">
+                        <button onClick={() => generateInvestorPDF(inv)} className="px-5 py-3 md:px-6 md:py-3 bg-white/10 border border-white/20 rounded-2xl text-[9px] md:text-[10px] font-black uppercase tracking-widest hover:bg-white hover:text-slate-900 transition-all italic shrink-0 flex items-center gap-2 italic">
+                          <span>📥</span> Export
                         </button>
-                        <button onClick={() => handleDepositFunds(inv)} className="px-6 py-3 bg-white/10 border border-white/20 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-emerald-600 hover:border-emerald-600 transition-all italic shrink-0">Add Funds</button>
-                        <button onClick={() => handleWithdrawFunds(inv)} className="px-6 py-3 bg-white/5 border border-white/10 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-red-500 hover:border-red-500 transition-all italic shrink-0">Withdraw Available</button>
+                        <button onClick={() => handleDepositFunds(inv)} className="px-5 py-3 md:px-6 md:py-3 bg-white/10 border border-white/20 rounded-2xl text-[9px] md:text-[10px] font-black uppercase tracking-widest hover:bg-emerald-600 hover:border-emerald-600 transition-all italic shrink-0">Add Funds</button>
+                        <button onClick={() => handleWithdrawFunds(inv)} className="px-5 py-3 md:px-6 md:py-3 bg-white/5 border border-white/10 rounded-2xl text-[9px] md:text-[10px] font-black uppercase tracking-widest hover:bg-red-500 hover:border-red-500 transition-all italic shrink-0">Withdraw</button>
                       </div>
                     </div>
-                    <div className="grid grid-cols-3 gap-6 italic">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 italic">
                       <div className="bg-white/5 p-6 rounded-[2rem] border border-white/10 group-hover:bg-white/10 transition-colors italic">
                         <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1 italic">Total Funding Pool</p>
                         <p className="text-xl font-black italic">{formatCurrency(inv.initialCapital)}</p>
@@ -1492,9 +1492,9 @@ const App: React.FC = () => {
                     </div>
                     <div className="p-10 bg-emerald-950/20 rounded-[3rem] border border-emerald-500/20 relative overflow-hidden italic shadow-inner">
                       <div className="flex justify-between items-end mb-6 italic">
-                        <div className="italic">
+                        <div className="italic text-center md:text-left">
                           <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest italic mb-2">Available Cash to Pull/Loan</p>
-                          <p className="text-5xl font-black italic tracking-tighter text-emerald-50 shadow-sm">{formatCurrency(inv.availableCapital)}</p>
+                          <p className="text-3xl md:text-5xl font-black italic tracking-tighter text-emerald-50 shadow-sm">{formatCurrency(inv.availableCapital)}</p>
                         </div>
                         <div className="text-right italic">
                           <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest italic mb-2">Overall Growth</p>
@@ -1806,20 +1806,20 @@ const App: React.FC = () => {
 
     return (
       <div className="space-y-10 animate-in fade-in slide-in-from-bottom-6 duration-700 italic">
-        <div className="flex justify-between items-end italic">
-          <div>
-            <h2 className="text-5xl font-black text-slate-900 tracking-tight italic">Analytics</h2>
-            <p className="text-slate-500 mt-2 text-lg font-medium italic">See how your money is growing and how well it's working.</p>
+        <div className="flex flex-col md:flex-row justify-between items-center md:items-end gap-6 italic">
+          <div className="italic text-center md:text-left">
+            <h2 className="text-4xl md:text-5xl font-black text-slate-900 tracking-tight italic">Analytics</h2>
+            <p className="text-slate-500 mt-2 text-base md:text-lg font-medium italic">Monitor how your money is growing and working.</p>
           </div>
-          <div className="flex gap-4 items-center italic shrink-0">
+          <div className="flex flex-col md:flex-row gap-4 items-center italic shrink-0 w-full md:w-auto">
             <button
               onClick={generateFullAdminPDF}
-              className="px-6 py-4 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-slate-800 transition-all shadow-lg flex items-center gap-3 italic"
+              className="w-full md:w-auto px-6 py-4 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-slate-800 transition-all shadow-lg flex items-center justify-center gap-3 italic"
             >
-              <span>📊</span> System Audit Report (PDF)
+              <span>📊</span> Audit Report (PDF)
             </button>
-            <div className="bg-blue-50 px-6 py-4 rounded-2xl border border-blue-100 italic">
-              <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest italic mb-1">Money Health Score</p>
+            <div className="bg-blue-50 px-6 py-4 rounded-2xl border border-blue-100 italic w-full md:w-auto text-center md:text-left">
+              <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest italic mb-1">Health Score</p>
               <p className="text-2xl font-black text-blue-700 italic">Excellent</p>
             </div>
           </div>
@@ -2069,16 +2069,16 @@ const App: React.FC = () => {
               </div>
             </div>
           </div>
-          <div className="flex flex-col items-end gap-3 italic">
-            <div className="flex gap-3 italic">
+          <div className="flex flex-col items-center md:items-end gap-3 italic w-full md:w-auto">
+            <div className="flex flex-col sm:flex-row gap-3 italic w-full md:w-auto">
               <button
                 onClick={() => generateCustomerPDF(customer)}
-                className="px-8 py-4 bg-emerald-600 text-white rounded-2xl font-black hover:bg-emerald-700 transition-all shadow-lg flex items-center gap-3 italic"
+                className="w-full sm:w-auto px-8 py-4 bg-emerald-600 text-white rounded-2xl font-black hover:bg-emerald-700 transition-all shadow-lg flex items-center justify-center gap-3 italic"
               >
-                <span>📄</span> Download Statement (PDF)
+                <span>📄</span> Get PDF
               </button>
               {!customer.isCompleted && (
-                <button onClick={handleExtendLoan} className="px-8 py-4 bg-white border border-slate-200 rounded-2xl font-black text-slate-700 hover:bg-amber-50 hover:border-amber-200 transition-all shadow-sm italic flex items-center gap-3 italic">
+                <button onClick={handleExtendLoan} className="w-full sm:w-auto px-8 py-4 bg-white border border-slate-200 rounded-2xl font-black text-slate-700 hover:bg-amber-50 hover:border-amber-200 transition-all shadow-sm italic flex items-center justify-center gap-3 italic">
                   <span className="text-lg italic">🕒</span> Extend Loan
                 </button>
               )}
@@ -2086,7 +2086,7 @@ const App: React.FC = () => {
 
             {/* Extensions List */}
             {customer.extensions && customer.extensions.length > 0 && (
-              <div className="bg-white p-4 rounded-3xl border border-blue-100 shadow-lg shadow-blue-50/50 flex flex-col gap-2 w-64 animate-in fade-in slide-in-from-top-2">
+              <div className="bg-white p-4 rounded-3xl border border-blue-100 shadow-lg shadow-blue-50/50 flex flex-col gap-2 w-full sm:w-64 animate-in fade-in slide-in-from-top-2">
                 <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest pl-2">Active Extensions</p>
                 {customer.extensions.map(ext => (
                   <div key={ext.id} className="flex justify-between items-center bg-blue-50/50 p-2 rounded-2xl border border-blue-100 group">
@@ -2172,10 +2172,25 @@ const App: React.FC = () => {
   return (
     <div className="min-h-screen flex bg-slate-50 italic font-sans italic">
       <Sidebar currentTab={currentTab} onTabChange={handleTabChange} isAdmin={isAdmin} />
-      <main className="flex-1 ml-64 p-12 overflow-y-auto relative italic">
-        <header className="flex justify-between items-center mb-16 relative z-10 italic">
-          <div className="flex items-center gap-8 italic"><div className="bg-white p-2.5 rounded-[1.8rem] border border-slate-100 shadow-xl transform rotate-[-2deg] italic"><BisdashLogo className="w-12 h-12 italic" /></div><div className="flex items-center gap-5 bg-white px-8 py-4 rounded-[1.8rem] border border-slate-100 shadow-sm font-black uppercase text-slate-700 tracking-widest italic">📅 {new Date().toLocaleDateString('en-PH', { month: 'long', day: 'numeric', year: 'numeric' })}</div></div>
-          <div className="flex items-center gap-6 bg-white pl-8 pr-4 py-3 rounded-[2rem] border border-slate-100 shadow-sm italic"><div className="text-right italic"><p className="text-base font-black text-slate-900 leading-none mb-1 italic">Admin Account</p><p className="text-[10px] font-black uppercase text-emerald-500 tracking-widest leading-none italic">Status: Online</p></div><div className="w-14 h-14 rounded-2xl bg-slate-100 border-4 border-slate-50 shadow-md overflow-hidden italic"><img src={`https://i.pravatar.cc/150?u=admin`} alt="avatar" className="w-full h-full object-cover italic" /></div></div>
+      <main className="flex-1 md:ml-64 p-6 md:p-12 pb-32 md:pb-12 overflow-y-auto relative italic">
+        <header className="flex flex-col md:flex-row justify-between items-center gap-6 mb-12 md:mb-16 relative z-10 italic">
+          <div className="flex items-center gap-4 md:gap-8 italic w-full md:w-auto">
+            <div className="bg-white p-2.5 rounded-[1.8rem] border border-slate-100 shadow-xl transform rotate-[-2deg] italic">
+              <BisdashLogo className="w-10 h-10 md:w-12 md:h-12 italic" />
+            </div>
+            <div className="flex-1 flex items-center justify-center md:justify-start gap-4 bg-white px-6 md:px-8 py-3 md:py-4 rounded-[1.8rem] border border-slate-100 shadow-sm font-black uppercase text-slate-700 tracking-widest italic text-xs md:text-sm">
+              📅 {new Date().toLocaleDateString('en-PH', { month: 'short', day: 'numeric' })}
+            </div>
+          </div>
+          <div className="flex items-center gap-4 bg-white pl-6 pr-3 py-2 rounded-[2rem] border border-slate-100 shadow-sm italic w-full md:w-auto justify-between md:justify-start">
+            <div className="text-right italic">
+              <p className="text-sm md:text-base font-black text-slate-900 leading-none mb-1 italic">Admin</p>
+              <p className="text-[8px] md:text-[10px] font-black uppercase text-emerald-500 tracking-widest leading-none italic">Online</p>
+            </div>
+            <div className="w-10 h-10 md:w-14 md:h-14 rounded-2xl bg-slate-100 border-2 md:border-4 border-slate-50 shadow-md overflow-hidden italic">
+              <img src={`https://i.pravatar.cc/150?u=admin`} alt="avatar" className="w-full h-full object-cover italic" />
+            </div>
+          </div>
         </header>
 
         {selectedCustomer ? renderCustomerDetails(selectedCustomer) : (
@@ -2183,23 +2198,31 @@ const App: React.FC = () => {
             {currentTab === 'overview' && renderDashboard()}
             {currentTab === 'customers' && (
               <div className="space-y-10 animate-in fade-in duration-500 italic">
-                <div className="flex justify-between items-center italic"><div className="italic"><h2 className="text-5xl font-black text-slate-900 tracking-tight italic">Customers</h2><p className="text-slate-500 mt-2 text-lg font-medium italic">Monitor active and completed borrowing cycles.</p></div><button onClick={() => setIsAddingNew(true)} className="bg-slate-900 text-white px-10 py-5 rounded-[2.2rem] font-black text-lg hover:bg-emerald-600 shadow-2xl transition-all active:scale-95 italic">+ New Customer Loan</button></div>
-                <div className="bg-white rounded-[3rem] border border-slate-100 shadow-sm overflow-hidden italic">
-                  <table className="w-full text-left border-collapse italic">
-                    <thead><tr className="bg-slate-50/50 italic font-black uppercase text-[10px] tracking-widest text-slate-400 italic"><th className="px-10 py-8 italic">Customer Name</th><th className="px-10 py-8 italic">Loan Amount</th><th className="px-10 py-8 italic">Status</th><th className="px-10 py-8 italic">Progress</th><th className="px-10 py-8 italic">Investor Pool</th><th className="px-10 py-8 italic"></th></tr></thead>
-                    <tbody className="divide-y divide-slate-100 italic">
-                      {customers.map((customer) => (
-                        <tr key={customer.id} className={`hover:bg-slate-50/80 transition-all group italic ${customer.isCompleted ? 'bg-emerald-50/20' : ''}`}>
-                          <td className="px-10 py-10 italic"><p className={`font-black text-xl italic ${customer.isCompleted ? 'text-slate-400' : 'text-slate-900'}`}>{customer.name}</p><p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1 italic">Started {formatDate(customer.startDate)}</p></td>
-                          <td className="px-10 py-10 italic"><p className={`font-black text-xl tracking-tighter italic ${customer.isCompleted ? 'text-emerald-700' : 'text-blue-600'}`}>{formatCurrency(customer.principalAmount)}</p><p className="text-[10px] font-bold text-slate-400 uppercase italic">Capital Base</p></td>
-                          <td className="px-10 py-10 italic">{customer.isCompleted ? (<div className="flex items-center gap-2 italic"><span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse italic"></span><span className="px-4 py-1.5 bg-emerald-100 text-emerald-700 rounded-full text-[10px] font-black uppercase tracking-widest italic shadow-sm">DONE</span></div>) : (<div className="flex items-center gap-2 italic"><span className="w-2 h-2 rounded-full bg-blue-500 italic"></span><span className="px-4 py-1.5 bg-blue-50 text-blue-600 rounded-full text-[10px] font-black uppercase tracking-widest italic shadow-sm">ACTIVE</span></div>)}</td>
-                          <td className="px-10 py-10 italic"><div className="flex flex-col gap-2 italic"><p className={`font-black text-lg tracking-tighter italic ${customer.isCompleted ? 'text-emerald-600' : 'text-slate-900'}`}>{customer.isCompleted ? 'Fully Settled' : `${formatCurrency(customer.remainingBalance)} Left`}</p><div className="w-32 h-1.5 bg-slate-100 rounded-full overflow-hidden italic"><div className={`h-full transition-all duration-700 ${customer.isCompleted ? 'bg-emerald-500' : 'bg-blue-500'}`} style={{ width: `${Math.round(((customer.totalPayable - customer.remainingBalance) / customer.totalPayable) * 100)}%` }}></div></div></div></td>
-                          <td className="px-10 py-10 italic"><span className={`px-5 py-2.5 rounded-full text-[9px] font-black uppercase tracking-widest border shadow-sm italic ${customer.isCompleted ? 'bg-slate-50 text-slate-400 border-slate-100' : 'bg-emerald-50 text-emerald-700 border-emerald-100'}`}>{customer.moneyOwner}</span></td>
-                          <td className="px-10 py-10 text-right italic"><button onClick={() => setSelectedCustomer(customer)} className="bg-slate-100 text-slate-700 px-8 py-4 rounded-2xl font-black hover:bg-[#0f172a] hover:text-white transition-all shadow-sm italic text-xs uppercase tracking-widest italic">Open File</button></td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                <div className="flex flex-col md:flex-row justify-between items-center gap-8 italic">
+                  <div className="italic text-center md:text-left">
+                    <h2 className="text-4xl md:text-5xl font-black text-slate-900 tracking-tight italic">Customers</h2>
+                    <p className="text-slate-500 mt-2 text-base md:text-lg font-medium italic">Monitor active and completed borrowing cycles.</p>
+                  </div>
+                  <button onClick={() => setIsAddingNew(true)} className="w-full md:w-auto bg-slate-900 text-white px-10 py-5 rounded-[2.2rem] font-black text-lg hover:bg-emerald-600 shadow-2xl transition-all active:scale-95 italic">+ New Customer Loan</button>
+                </div>
+                <div className="bg-white rounded-[2.5rem] md:rounded-[3rem] border border-slate-100 shadow-sm overflow-hidden italic">
+                  <div className="overflow-x-auto custom-scrollbar">
+                    <table className="w-full text-left border-collapse italic">
+                      <thead><tr className="bg-slate-50/50 italic font-black uppercase text-[10px] tracking-widest text-slate-400 italic"><th className="px-10 py-8 italic">Customer Name</th><th className="px-10 py-8 italic">Loan Amount</th><th className="px-10 py-8 italic">Status</th><th className="px-10 py-8 italic">Progress</th><th className="px-10 py-8 italic">Investor Pool</th><th className="px-10 py-8 italic"></th></tr></thead>
+                      <tbody className="divide-y divide-slate-100 italic">
+                        {customers.map((customer) => (
+                          <tr key={customer.id} className={`hover:bg-slate-50/80 transition-all group italic ${customer.isCompleted ? 'bg-emerald-50/20' : ''}`}>
+                            <td className="px-10 py-10 italic"><p className={`font-black text-xl italic ${customer.isCompleted ? 'text-slate-400' : 'text-slate-900'}`}>{customer.name}</p><p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1 italic">Started {formatDate(customer.startDate)}</p></td>
+                            <td className="px-10 py-10 italic"><p className={`font-black text-xl tracking-tighter italic ${customer.isCompleted ? 'text-emerald-700' : 'text-blue-600'}`}>{formatCurrency(customer.principalAmount)}</p><p className="text-[10px] font-bold text-slate-400 uppercase italic">Capital Base</p></td>
+                            <td className="px-10 py-10 italic">{customer.isCompleted ? (<div className="flex items-center gap-2 italic"><span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse italic"></span><span className="px-4 py-1.5 bg-emerald-100 text-emerald-700 rounded-full text-[10px] font-black uppercase tracking-widest italic shadow-sm">DONE</span></div>) : (<div className="flex items-center gap-2 italic"><span className="w-2 h-2 rounded-full bg-blue-500 italic"></span><span className="px-4 py-1.5 bg-blue-50 text-blue-600 rounded-full text-[10px] font-black uppercase tracking-widest italic shadow-sm">ACTIVE</span></div>)}</td>
+                            <td className="px-10 py-10 italic"><div className="flex flex-col gap-2 italic"><p className={`font-black text-lg tracking-tighter italic ${customer.isCompleted ? 'text-emerald-600' : 'text-slate-900'}`}>{customer.isCompleted ? 'Fully Settled' : `${formatCurrency(customer.remainingBalance)} Left`}</p><div className="w-32 h-1.5 bg-slate-100 rounded-full overflow-hidden italic"><div className={`h-full transition-all duration-700 ${customer.isCompleted ? 'bg-emerald-500' : 'bg-blue-500'}`} style={{ width: `${Math.round(((customer.totalPayable - customer.remainingBalance) / customer.totalPayable) * 100)}%` }}></div></div></div></td>
+                            <td className="px-10 py-10 italic"><span className={`px-5 py-2.5 rounded-full text-[9px] font-black uppercase tracking-widest border shadow-sm italic ${customer.isCompleted ? 'bg-slate-50 text-slate-400 border-slate-100' : 'bg-emerald-50 text-emerald-700 border-emerald-100'}`}>{customer.moneyOwner}</span></td>
+                            <td className="px-10 py-10 text-right italic"><button onClick={() => setSelectedCustomer(customer)} className="bg-slate-100 text-slate-700 px-8 py-4 rounded-2xl font-black hover:bg-[#0f172a] hover:text-white transition-all shadow-sm italic text-xs uppercase tracking-widest italic">Open File</button></td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               </div>
             )}
