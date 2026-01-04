@@ -2108,8 +2108,8 @@ const App: React.FC = () => {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 italic">
-          <div className="lg:col-span-3 space-y-10 italic">
+        <div className="grid grid-cols-1 xl:grid-cols-4 gap-10 italic">
+          <div className="xl:col-span-3 space-y-10 italic">
             <div className="space-y-6 italic">
               <h3 className="text-2xl font-black text-slate-900 tracking-tight italic flex items-center gap-3 italic">Payment Pulse <span className="px-3 py-1 bg-emerald-100 text-emerald-700 text-[10px] rounded-full italic font-black uppercase tracking-widest">15th & 30th Schedule</span></h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-6 italic">
@@ -2136,22 +2136,28 @@ const App: React.FC = () => {
               <StatCard label="Running Collections" value={formatCurrency(totalPaidCalculated)} icon="📈" trend="up" subtext="Net Profit Flow" />
             </div>
           </div>
-          <div className="space-y-8 italic">
-            <div className="bg-[#0f172a] text-white p-10 rounded-[3rem] shadow-2xl relative overflow-hidden text-center flex flex-col justify-between italic h-[400px]">
-              <h3 className="text-2xl font-black tracking-tight italic uppercase tracking-[0.2em] pt-4 italic">Repayment Pulse</h3>
-              <div className="relative w-48 h-48 mx-auto flex items-center justify-center italic">
-                <svg viewBox="0 0 160 160" className="w-full h-full transform -rotate-90 italic">
-                  <circle cx="80" cy="80" r={radius} stroke="currentColor" strokeWidth="12" fill="transparent" className="text-slate-800 italic" />
+          <div className="xl:col-span-1 space-y-8 italic">
+            <div className="bg-[#0f172a] text-white p-12 rounded-[3.5rem] shadow-2xl relative text-center flex flex-col items-center gap-10 italic border border-white/5">
+              <h3 className="text-2xl font-black tracking-tight italic uppercase tracking-[0.2em] italic">Repayment Pulse</h3>
+              <div className="relative w-56 h-56 flex items-center justify-center italic">
+                <svg viewBox="0 0 160 160" className="w-full h-full transform -rotate-90 italic drop-shadow-2xl">
+                  <circle cx="80" cy="80" r={radius} stroke="currentColor" strokeWidth="12" fill="transparent" className="text-white/5 italic" />
                   <circle cx="80" cy="80" r={radius} stroke="currentColor" strokeWidth="12" fill="transparent" strokeDasharray={circumference} strokeDashoffset={dashOffset} strokeLinecap="round" className="text-emerald-500 italic transition-all duration-1000 ease-out" />
                 </svg>
-                <span className="absolute text-5xl font-black italic tracking-tighter italic">{progressPercent}%</span>
+                <div className="absolute inset-0 flex flex-col items-center justify-center italic">
+                  <span className="text-5xl font-black italic tracking-tighter italic">{progressPercent}%</span>
+                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest italic mt-1">Done</span>
+                </div>
               </div>
-              <div className="pb-4 space-y-4 italic">
-                <div className="text-center italic"><p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1 italic">Left to Collect</p><p className="text-2xl font-black italic">{formatCurrency(customer.remainingBalance)}</p></div>
+              <div className="w-full space-y-8 italic">
+                <div className="text-center italic">
+                  <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1 italic">Left to Collect</p>
+                  <p className="text-3xl font-black italic">{formatCurrency(customer.remainingBalance)}</p>
+                </div>
                 {!customer.isCompleted ? (
-                  <button onClick={handleFullSettle} className="w-full py-5 bg-emerald-600 rounded-[2rem] font-black text-lg hover:bg-emerald-700 shadow-[0_12px_40_rgba(16,185,129,0.5)] transition-all italic">Mark Fully Paid</button>
+                  <button onClick={handleFullSettle} className="w-full py-6 bg-emerald-600 rounded-[2.2rem] font-black text-lg hover:bg-emerald-700 shadow-[0_15px_45px_-12px_rgba(16,185,129,0.5)] transition-all italic active:scale-95">Mark Fully Paid</button>
                 ) : (
-                  <div className="w-full py-5 bg-emerald-500/10 border border-emerald-500/30 rounded-[2rem] text-emerald-400 font-black text-lg italic uppercase tracking-widest flex items-center justify-center gap-2 italic animate-in zoom-in-95"><span>✅</span> Loan Completed</div>
+                  <div className="w-full py-6 bg-emerald-500/10 border border-emerald-500/30 rounded-[2.2rem] text-emerald-400 font-black text-lg italic uppercase tracking-widest flex items-center justify-center gap-2 italic animate-in zoom-in-95"><span>✅</span> Loan Completed</div>
                 )}
               </div>
             </div>
